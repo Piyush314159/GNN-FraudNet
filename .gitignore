@@ -1,1 +1,15 @@
 data/raw/*.csv
+
+# Virtual environment
+.venv/
+
+# IDE
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
