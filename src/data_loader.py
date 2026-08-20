@@ -40,24 +40,79 @@ OUTPUT:
 
 TODO: Implement each function below
 """
+import os
+import pandas as pd
+import numpy as np
+import torch
+from torch_geometric.data import Data
 
 def load_features(path):
     # TODO: read CSV, drop txId, return float DataFrame
-    pass
+    df = pd.read_csv(path)
+    df = df.drop(columns=["txId"])
+    return df.astype(float)
 
 def load_edges(path, node_mapping):
     # TODO: read edgelist, convert txIds to integer indices using node_mapping
     # return src_array, dst_array
-    pass
+    df = pd.read_csv(path)
+    df["txId1"] = df["txId1"].map(node_mapping)
+    df["txId2"] = df["txId2"].map(node_mapping)
+
+    n_before = len(df)
+    df = df.dropna(subset = ["txId1", "txId2"])
+
+    if len(df) < n_before:
+        print(f"load_edges: dropped {n_before - len(df)} edges with unmapped txId")
+    
+    src_array = df["txId1"].to_numpy(dtype= np.int64)
+    dst_array = df["txId2"].to_numpy(dtype = np.int64)
+
+    return src_array, dst_array
 
 def load_labels(path, node_mapping):
     # TODO: read classes CSV, map labels to 1/0/-1
     # return label array aligned with node_mapping order
-    pass
+    df = pd.read_csv(path)  # columns: txId, class
+    label_map = {"1": 1, "2": 0, "unknown": -1}
+    df["class"] = df["class"].astype(str).map(label_map)
+
+    # build array in node_mapping's index order
+    num_nodes = len(node_mapping)
+    labels = np.full(num_nodes, -1, dtype=np.int64)
+    for tx_id, cls in zip(df["txId"], df["class"]):
+        idx = node_mapping.get(tx_id)
+        if idx is not None:
+            labels[idx] = cls
+    return labels
 
 def build_pyg_data(raw_dir, save_dir):
     # TODO: call above three functions
     # build PyG Data(x, edge_index, y)
     # save to save_dir
     # return Data object
-    pass
+    features_path = os.path.join(raw_dir, "elliptic_txs_features.csv")
+    edges_path = os.path.join(raw_dir, "elliptic_txs_edgelist.csv")
+    classes_path = os.path.join(raw_dir, "elliptic_txs_classes.csv")
+
+    # node_mapping needs txId in original row order — read it once here,
+    # since load_features() drops the column before returning
+    raw_features = pd.read_csv(features_path)
+    node_mapping = {tx_id: i for i, tx_id in enumerate(raw_features["txId"])}
+
+    x_df = load_features(features_path)
+    src_array, dst_array = load_edges(edges_path, node_mapping)
+    y_array = load_labels(classes_path, node_mapping)
+
+    x = torch.tensor(x_df.values, dtype=torch.float)
+    edge_index = torch.tensor(np.stack([src_array, dst_array]), dtype=torch.long)
+    y = torch.tensor(y_array, dtype=torch.long)
+
+    data = Data(x=x, edge_index=edge_index, y=y)
+
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, "elliptic_graph.pt")
+    torch.save(data, save_path)
+    print(f"Saved PyG Data object to {save_path}")
+
+    return data
