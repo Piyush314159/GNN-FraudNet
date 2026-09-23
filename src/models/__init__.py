@@ -1,5 +1,13 @@
 # Models package
-# Import GraphSAGE and GAT here once implemented
-# from .graphsage import GraphSAGE
-# from .gat import GAT
-# from .baseline import train_xgboost, train_logreg
+from .baseline import evaluate_baseline, predict_proba, train_logreg, train_xgboost
+from .gat import GAT
+from .graphsage import GraphSAGE
+
+__all__ = [
+    "GraphSAGE",
+    "GAT",
+    "train_logreg",
+    "train_xgboost",
+    "predict_proba",
+    "evaluate_baseline",
+]

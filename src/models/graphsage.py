@@ -33,10 +33,40 @@ HOW IT WORKS:
 OUTPUT:
     Logits tensor of shape (num_nodes, 2)
     Apply softmax externally for probabilities
-
-TODO: Implement GraphSAGE class below
 """
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import BatchNorm, SAGEConv
 
-class GraphSAGE:
-    # TODO: implement __init__, forward, reset_parameters
-    pass
+
+class GraphSAGE(nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=2, dropout=0.5):
+        super().__init__()
+        self.dropout = dropout
+
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+
+        self.convs.append(SAGEConv(in_channels, hidden_channels))
+        self.bns.append(BatchNorm(hidden_channels))
+        for _ in range(num_layers - 1):
+            self.convs.append(SAGEConv(hidden_channels, hidden_channels))
+            self.bns.append(BatchNorm(hidden_channels))
+
+        self.classifier = nn.Linear(hidden_channels, out_channels)
+
+    def forward(self, x, edge_index):
+        for conv, bn in zip(self.convs, self.bns):
+            x = conv(x, edge_index)
+            x = bn(x)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        return self.classifier(x)
+
+    def reset_parameters(self):
+        for conv in self.convs:
+            conv.reset_parameters()
+        for bn in self.bns:
+            bn.reset_parameters()
+        self.classifier.reset_parameters()

@@ -33,10 +33,41 @@ HOW IT WORKS:
 
 OUTPUT:
     Logits tensor of shape (num_nodes, 2)
-
-TODO: Implement GAT class below
 """
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GATConv
 
-class GAT:
-    # TODO: implement __init__, forward, get_attention_weights
-    pass
+
+class GAT(nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, heads=8, dropout=0.5):
+        super().__init__()
+        self.dropout = dropout
+
+        self.conv1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
+        self.conv2 = GATConv(hidden_channels * heads, out_channels, heads=1, concat=False, dropout=dropout)
+
+    def forward(self, x, edge_index):
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.conv1(x, edge_index)
+        x = F.elu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.conv2(x, edge_index)
+        return x
+
+    def get_attention_weights(self, x, edge_index):
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x, (edge_index_1, alpha_1) = self.conv1(x, edge_index, return_attention_weights=True)
+        x = F.elu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        logits, (edge_index_2, alpha_2) = self.conv2(x, edge_index, return_attention_weights=True)
+
+        attention_weights = {
+            "layer1": (edge_index_1, alpha_1),
+            "layer2": (edge_index_2, alpha_2),
+        }
+        return logits, attention_weights
+
+    def reset_parameters(self):
+        self.conv1.reset_parameters()
+        self.conv2.reset_parameters()

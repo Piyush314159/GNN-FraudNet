@@ -37,8 +37,6 @@ HOW IT WORKS:
 
 OUTPUT:
     PyG Data object saved at data/processed/elliptic_graph.pt
-
-TODO: Implement each function below
 """
 import os
 import pandas as pd
@@ -47,14 +45,11 @@ import torch
 from torch_geometric.data import Data
 
 def load_features(path):
-    # TODO: read CSV, drop txId, return float DataFrame
     df = pd.read_csv(path)
     df = df.drop(columns=["txId"])
     return df.astype(float)
 
 def load_edges(path, node_mapping):
-    # TODO: read edgelist, convert txIds to integer indices using node_mapping
-    # return src_array, dst_array
     df = pd.read_csv(path)
     df["txId1"] = df["txId1"].map(node_mapping)
     df["txId2"] = df["txId2"].map(node_mapping)
@@ -71,8 +66,6 @@ def load_edges(path, node_mapping):
     return src_array, dst_array
 
 def load_labels(path, node_mapping):
-    # TODO: read classes CSV, map labels to 1/0/-1
-    # return label array aligned with node_mapping order
     df = pd.read_csv(path)  # columns: txId, class
     label_map = {"1": 1, "2": 0, "unknown": -1}
     df["class"] = df["class"].astype(str).map(label_map)
@@ -87,10 +80,6 @@ def load_labels(path, node_mapping):
     return labels
 
 def build_pyg_data(raw_dir, save_dir):
-    # TODO: call above three functions
-    # build PyG Data(x, edge_index, y)
-    # save to save_dir
-    # return Data object
     features_path = os.path.join(raw_dir, "elliptic_txs_features.csv")
     edges_path = os.path.join(raw_dir, "elliptic_txs_edgelist.csv")
     classes_path = os.path.join(raw_dir, "elliptic_txs_classes.csv")

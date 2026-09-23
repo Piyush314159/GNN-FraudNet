@@ -26,9 +26,19 @@
 #
 # TO RUN:
 #   docker run -p 8000:8000 gnn-fraudnet
-#
-# TODO: Write actual Dockerfile commands below
 
 FROM python:3.10-slim
 
-# TODO: Install dependencies, copy files, set entrypoint
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+COPY api/ ./api/
+COPY results/best_graphsage.pt ./results/best_graphsage.pt
+COPY data/processed/elliptic_graph.pt ./data/processed/elliptic_graph.pt
+
+EXPOSE 8000
+
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
