@@ -1,0 +1,10 @@
+.venv
+.git
+.idea
+__pycache__
+data/raw
+notebooks
+explainer
+*.pyc
+.DS_Store
+.env.build

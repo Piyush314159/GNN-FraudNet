@@ -1,0 +1,14 @@
+# Minimal dependencies for the inference API only.
+# The full requirements.txt is for training/evaluation/explainability.
+#
+# API imports:  torch, fastapi, pydantic, torch_geometric (SAGEConv, BatchNorm)
+# ──────────────────────────────────────────────────────────────────────
+# NOTE: torch is installed separately from local wheels (see Dockerfile)
+
+# --- PyG (torch_scatter/torch_sparse are OPTIONAL since PyG 2.4+) ---
+torch-geometric==2.8.0.post1
+
+# --- Web framework ---
+fastapi==0.141.1
+uvicorn==0.52.3
+pydantic==2.13.4
