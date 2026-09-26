@@ -37,9 +37,12 @@ HOW TO RUN:
 """
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import torch
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.schema import FraudResponse, TransactionRequest
 from src.models.graphsage import GraphSAGE
@@ -48,6 +51,7 @@ MODEL_PATH = os.getenv("MODEL_PATH", "results/best_graphsage.pt")
 DATA_PATH = os.getenv("DATA_PATH", "data/processed/elliptic_graph.pt")
 NUM_FEATURES = 166
 HIDDEN_CHANNELS = 64
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 def _confidence_bucket(prob):
@@ -77,6 +81,16 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="GNN-FraudNet", description="GNN-based fraud detection API", lifespan=lifespan)
+
+# Serve static files (CSS, JS, images if any)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard():
+    """Serve the interactive fraud detection dashboard."""
+    html_path = STATIC_DIR / "index.html"
+    return HTMLResponse(content=html_path.read_text(), status_code=200)
 
 
 @app.get("/health")

@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GNN-FraudNet — Threat Detection Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #06080d;
+            --surface: #0c1017;
+            --surface-2: #131921;
+            --border: #1e2a3a;
+            --border-bright: #2a3a4e;
+            --cyan: #00f0ff;
+            --cyan-dim: rgba(0,240,255,0.15);
+            --magenta: #ff2d6b;
+            --magenta-dim: rgba(255,45,107,0.15);
+            --lime: #00ff94;
+            --lime-dim: rgba(0,255,148,0.12);
+            --amber: #ffb800;
+            --amber-dim: rgba(255,184,0,0.12);
+            --text: #e2e8f0;
+            --text-dim: #5a6a7e;
+            --text-mid: #8899aa;
+            --mono: 'IBM Plex Mono', 'Courier New', monospace;
+            --sans: 'Space Grotesk', sans-serif;
+            --display: 'Sora', sans-serif;
+        }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,240,255,0.008) 2px, rgba(0,240,255,0.008) 4px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .shell { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+
+        /* ─── TOP BAR ─── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .logo {
+            font-family: var(--display);
+            font-weight: 800;
+            font-size: 1.3rem;
+            letter-spacing: -0.5px;
+        }
+        .logo span { color: var(--cyan); }
+        .status-pill {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 4px;
+            background: var(--lime-dim);
+            color: var(--lime);
+            border: 1px solid rgba(0,255,148,0.25);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--lime);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .topbar-right {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        /* ─── BENTO GRID ─── */
+        .bento {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto;
+            gap: 0.75rem;
+        }
+
+        .tile {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+        .tile:hover { border-color: var(--border-bright); }
+
+        .tile-header {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-dim);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .tile-header .dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--cyan);
+        }
+
+        /* Metric tiles */
+        .tile-metric { padding: 1rem 1.25rem; }
+        .metric-val {
+            font-family: var(--display);
+            font-size: 2.2rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .metric-label {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0.3rem;
+        }
+
+        /* ─── HERO TILE ─── */
+        .tile-hero {
+            grid-column: span 3;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2rem 2rem;
+            background: linear-gradient(135deg, var(--surface) 0%, #0f1520 100%);
+            border-color: var(--border-bright);
+        }
+        .hero-text h1 {
+            font-family: var(--display);
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+        .hero-text h1 .highlight {
+            background: linear-gradient(90deg, var(--cyan), var(--magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero-text p {
+            font-family: var(--sans);
+            color: var(--text-mid);
+            font-size: 0.9rem;
+            margin-top: 0.6rem;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+        .hero-stats {
+            display: flex;
+            gap: 2rem;
+        }
+        .hero-stat {
+            text-align: right;
+        }
+        .hero-stat .val {
+            font-family: var(--mono);
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--cyan);
+        }
+        .hero-stat .lbl {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ─── INPUT TILE ─── */
+        .tile-input {
+            grid-column: span 2;
+            grid-row: span 2;
+        }
+
+        /* Mode selector */
+        .mode-switch {
+            display: flex;
+            gap: 2px;
+            background: var(--bg);
+            border-radius: 6px;
+            padding: 2px;
+            margin-bottom: 1.25rem;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 0.55rem 0.75rem;
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
+            background: transparent;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .mode-btn.active {
+            background: var(--surface-2);
+            color: var(--cyan);
+            border: 1px solid rgba(0,240,255,0.2);
+        }
+        .mode-btn:hover:not(.active) { color: var(--text-mid); }
+
+        .mode-panel { display: none; }
+        .mode-panel.active { display: block; }
+
+        /* Feature inputs */
+        .feat-scroll {
+            max-height: 280px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.4rem;
+            padding-right: 0.4rem;
+            margin-bottom: 1rem;
+        }
+        .feat-scroll::-webkit-scrollbar { width: 3px; }
+        .feat-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .fi {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .fi label {
+            font-family: var(--mono);
+            font-size: 0.55rem;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+        .fi input, .node-input input {
+            width: 100%;
+            padding: 0.4rem 0.5rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--cyan);
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .fi input:focus, .node-input input:focus { border-color: var(--cyan); box-shadow: 0 0 8px rgba(0,240,255,0.1); }
+        .fi input::placeholder { color: #2a3a4e; }
+
+        .quick-actions {
+            display: flex;
+            gap: 0.35rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .qbtn {
+            padding: 0.35rem 0.65rem;
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-mid);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .qbtn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+        /* Upload zone */
+        .drop-zone {
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 1rem;
+        }
+        .drop-zone:hover { border-color: var(--cyan); background: rgba(0,240,255,0.02); }
+        .drop-zone.over { border-color: var(--cyan); background: rgba(0,240,255,0.05); }
+        .drop-zone .dz-icon {
+            font-family: var(--mono);
+            font-size: 1.8rem;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+        .drop-zone .dz-text {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--text-mid);
+        }
+        .drop-zone .dz-hint {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            margin-top: 0.4rem;
+        }
+        .drop-zone input { display: none; }
+
+        .file-tag {
+            display: none;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 0.8rem;
+            background: var(--cyan-dim);
+            border: 1px solid rgba(0,240,255,0.2);
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+        }
+        .file-tag.show { display: flex; }
+        .file-tag .rm {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        /* Node input */
+        .node-input {
+            margin-bottom: 1rem;
+        }
+        .node-input label {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+        .node-presets {
+            display: flex;
+            gap: 0.35rem;
+            margin-top: 0.6rem;
+        }
+
+        /* Run button */
+        .run-btn {
+            width: 100%;
+            padding: 0.75rem;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border: 1px solid var(--cyan);
+            background: rgba(0,240,255,0.08);
+            color: var(--cyan);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .run-btn:hover { background: rgba(0,240,255,0.15); box-shadow: 0 0 20px rgba(0,240,255,0.15); }
+        .run-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .run-btn .spin {
+            display: none;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(0,240,255,0.3);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: sp 0.5s linear infinite;
+        }
+        @keyframes sp { to { transform: rotate(360deg); } }
+        .run-btn.loading .spin { display: block; }
+        .run-btn.loading .rtxt { display: none; }
+
+        /* ─── OUTPUT TILE ─── */
+        .tile-output {
+            grid-row: span 2;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .output-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            text-align: center;
+            gap: 0.5rem;
+        }
+        .output-empty .oe-icon { font-size: 2rem; opacity: 0.3; }
+
+        .output-result { display: none; flex-direction: column; align-items: center; gap: 1.25rem; animation: fadeUp 0.5s ease; }
+        .output-result.show { display: flex; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Ring gauge */
+        .ring-wrap { position: relative; width: 160px; height: 160px; }
+        .ring-wrap svg { transform: rotate(-90deg); filter: drop-shadow(0 0 12px rgba(0,240,255,0.2)); }
+        .ring-bg { fill: none; stroke: var(--surface-2); stroke-width: 8; }
+        .ring-fill {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s;
+        }
+        .ring-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .ring-center .rv {
+            font-family: var(--display);
+            font-size: 2.2rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .ring-center .rl {
+            font-family: var(--mono);
+            font-size: 0.55rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-top: 0.2rem;
+        }
+
+        .verdict-badge {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.4rem 1.2rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .verdict-badge.safe { background: var(--lime-dim); color: var(--lime); border: 1px solid rgba(0,255,148,0.3); }
+        .verdict-badge.danger { background: var(--magenta-dim); color: var(--magenta); border: 1px solid rgba(255,45,107,0.3); }
+        .verdict-badge.warn { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(255,184,0,0.3); }
+
+        .out-meta {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        /* ─── BATCH TABLE TILE ─── */
+        .tile-batch {
+            grid-column: span 3;
+            display: none;
+        }
+        .tile-batch.show { display: block; }
+
+        .batch-stats {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            animation: fadeUp 0.4s ease;
+        }
+        .bs {
+            padding: 0.8rem 1.5rem;
+            border-radius: 6px;
+            text-align: center;
+            flex: 1;
+        }
+        .bs.total { background: var(--cyan-dim); border: 1px solid rgba(0,240,255,0.15); }
+        .bs.safe { background: var(--lime-dim); border: 1px solid rgba(0,255,148,0.15); }
+        .bs.fraud { background: var(--magenta-dim); border: 1px solid rgba(255,45,107,0.15); }
+        .bs .bsv {
+            font-family: var(--display);
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        .bs.total .bsv { color: var(--cyan); }
+        .bs.safe .bsv { color: var(--lime); }
+        .bs.fraud .bsv { color: var(--magenta); }
+        .bs .bsl {
+            font-family: var(--mono);
+            font-size: 0.55rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0.15rem;
+        }
+
+        .tbl-wrap {
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            animation: fadeUp 0.5s ease;
+        }
+        .tbl-wrap::-webkit-scrollbar { width: 3px; }
+        .tbl-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            padding: 0.6rem 1rem;
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            background: var(--bg);
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        td {
+            padding: 0.5rem 1rem;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-mid);
+        }
+        tr:hover td { background: rgba(255,255,255,0.015); }
+        .tag {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tag.s { background: var(--lime-dim); color: var(--lime); }
+        .tag.d { background: var(--magenta-dim); color: var(--magenta); }
+        .tag.w { background: var(--amber-dim); color: var(--amber); }
+
+        /* ─── FOOTER ─── */
+        .foot {
+            text-align: center;
+            padding: 2rem 0 1.5rem;
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 900px) {
+            .bento { grid-template-columns: 1fr; }
+            .tile-hero, .tile-input, .tile-batch { grid-column: span 1; }
+            .hero-stats { display: none; }
+            .feat-scroll { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <!-- TOPBAR -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <div class="logo">GNN<span>.</span>FraudNet</div>
+                <div class="status-pill"><span class="status-dot"></span> System Online</div>
+            </div>
+            <div class="topbar-right" id="clock"></div>
+        </div>
+
+        <!-- BENTO GRID -->
+        <div class="bento">
+            <!-- Hero -->
+            <div class="tile tile-hero">
+                <div class="hero-text">
+                    <h1>Bitcoin Threat<br><span class="highlight">Detection Console</span></h1>
+                    <p>Graph Neural Network analyzing 203K+ transaction nodes for illicit activity patterns.</p>
+                </div>
+                <div class="hero-stats">
+                    <div class="hero-stat"><div class="val">0.92</div><div class="lbl">PR-AUC</div></div>
+                    <div class="hero-stat"><div class="val">0.74</div><div class="lbl">F1 Score</div></div>
+                    <div class="hero-stat"><div class="val">203K</div><div class="lbl">Nodes</div></div>
+                </div>
+            </div>
+
+            <!-- Input Tile -->
+            <div class="tile tile-input">
+                <div class="tile-header"><span class="dot"></span> Input Console</div>
+
+                <div class="mode-switch">
+                    <button class="mode-btn active" data-m="single" onclick="setMode('single')">Transaction</button>
+                    <button class="mode-btn" data-m="csv" onclick="setMode('csv')">CSV Batch</button>
+                    <button class="mode-btn" data-m="node" onclick="setMode('node')">Node Query</button>
+                </div>
+
+                <!-- Single -->
+                <div class="mode-panel active" id="mp-single">
+                    <div class="quick-actions">
+                        <button class="qbtn" onclick="preset('zero')">Zero Fill</button>
+                        <button class="qbtn" onclick="preset('rand')">Randomize</button>
+                        <button class="qbtn" onclick="preset('suspect')">Suspect Pattern</button>
+                        <button class="qbtn" onclick="preset('clear')">Clear</button>
+                    </div>
+                    <div class="feat-scroll" id="fgrid"></div>
+                    <button class="run-btn" id="rbtn1" onclick="runSingle()">
+                        <span class="rtxt">▶ Execute Scan</span><span class="spin"></span>
+                    </button>
+                </div>
+
+                <!-- CSV -->
+                <div class="mode-panel" id="mp-csv">
+                    <div class="drop-zone" id="dz" onclick="document.getElementById('csvIn').click()">
+                        <div class="dz-icon">[CSV]</div>
+                        <div class="dz-text">Drop CSV file here or click to browse</div>
+                        <div class="dz-hint">Columns: feature_1, feature_2, ... feature_166</div>
+                        <input type="file" id="csvIn" accept=".csv" onchange="onFile(event)">
+                    </div>
+                    <div class="file-tag" id="ftag">
+                        <span>📄</span>
+                        <span id="fname"></span>
+                        <button class="rm" onclick="rmFile()">✕</button>
+                    </div>
+                    <button class="run-btn" id="rbtn2" onclick="runBatch()" disabled>
+                        <span class="rtxt">▶ Batch Analyze</span><span class="spin"></span>
+                    </button>
+                </div>
+
+                <!-- Node -->
+                <div class="mode-panel" id="mp-node">
+                    <div class="node-input">
+                        <label>Node ID (0 — 203,768)</label>
+                        <input type="number" id="nid" placeholder="Enter node ID..." min="0" max="203768"
+                               onkeydown="if(event.key==='Enter')runNode()">
+                    </div>
+                    <div class="node-presets">
+                        <button class="qbtn" onclick="document.getElementById('nid').value=42;runNode()">ID:42</button>
+                        <button class="qbtn" onclick="document.getElementById('nid').value=1337;runNode()">ID:1337</button>
+                        <button class="qbtn" onclick="document.getElementById('nid').value=Math.floor(Math.random()*203769);runNode()">Random</button>
+                    </div>
+                    <button class="run-btn" id="rbtn3" onclick="runNode()" style="margin-top: 1rem;">
+                        <span class="rtxt">▶ Query Node</span><span class="spin"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Output Tile -->
+            <div class="tile tile-output">
+                <div class="tile-header"><span class="dot"></span> Scan Result</div>
+
+                <div class="output-empty" id="oempty">
+                    <div class="oe-icon">◎</div>
+                    <div>Awaiting input...<br>Run a scan to see results</div>
+                </div>
+
+                <div class="output-result" id="oresult"></div>
+            </div>
+
+            <!-- Batch results -->
+            <div class="tile tile-batch" id="batchTile">
+                <div class="tile-header"><span class="dot"></span> Batch Results</div>
+                <div id="batchContent"></div>
+            </div>
+        </div>
+
+        <div class="foot">GraphSAGE · PyTorch Geometric · FastAPI · GNN-FraudNet v1.0</div>
+    </div>
+
+<script>
+    // ─── CLOCK ───
+    function tick() {
+        const d = new Date();
+        document.getElementById('clock').textContent =
+            d.toISOString().replace('T',' ').substring(0,19) + ' UTC';
+    }
+    tick(); setInterval(tick, 1000);
+
+    // ─── FEATURE GRID ───
+    const fg = document.getElementById('fgrid');
+    for (let i = 1; i <= 166; i++) {
+        fg.innerHTML += `<div class="fi"><label>f_${i}</label><input type="number" step="any" id="f${i}" placeholder="0.0"></div>`;
+    }
+
+    // ─── MODES ───
+    function setMode(m) {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.m === m));
+        document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('mp-' + m).classList.add('active');
+    }
+
+    // ─── PRESETS ───
+    function preset(t) {
+        for (let i = 1; i <= 166; i++) {
+            const el = document.getElementById('f' + i);
+            if (t === 'zero') el.value = '0.0';
+            else if (t === 'rand') el.value = (Math.random() * 4 - 2).toFixed(3);
+            else if (t === 'suspect') el.value = (Math.random() * 8 - 2).toFixed(3);
+            else el.value = '';
+        }
+    }
+
+    // ─── RING GAUGE ───
+    function ring(prob) {
+        const c = 2 * Math.PI * 66;
+        const off = c * (1 - prob);
+        let col = prob < 0.3 ? 'var(--lime)' : prob < 0.7 ? 'var(--amber)' : 'var(--magenta)';
+        return `<div class="ring-wrap">
+            <svg width="160" height="160" viewBox="0 0 150 150">
+                <circle cx="75" cy="75" r="66" class="ring-bg"/>
+                <circle cx="75" cy="75" r="66" class="ring-fill"
+                    style="stroke:${col};stroke-dasharray:${c};stroke-dashoffset:${off}"/>
+            </svg>
+            <div class="ring-center">
+                <div class="rv" style="color:${col}">${(prob*100).toFixed(1)}%</div>
+                <div class="rl">Fraud Risk</div>
+            </div>
+        </div>`;
+    }
+
+    function showResult(data) {
+        const cls = data.fraud_probability < 0.3 ? 'safe' : data.fraud_probability > 0.7 ? 'danger' : 'warn';
+        const labels = { safe: '✓ LEGITIMATE', danger: '✗ FRAUDULENT', warn: '? UNCERTAIN' };
+        let nfo = data.node_id !== null ? `Node: ${data.node_id}<br>` : '';
+        document.getElementById('oempty').style.display = 'none';
+        const el = document.getElementById('oresult');
+        el.innerHTML = ring(data.fraud_probability) +
+            `<div class="verdict-badge ${cls}">${labels[cls]}</div>
+             <div class="out-meta">${nfo}Confidence: ${data.confidence}<br>
+             Prob: ${data.fraud_probability.toFixed(8)}</div>`;
+        el.classList.add('show');
+    }
+
+    // ─── SINGLE ───
+    async function runSingle() {
+        const btn = document.getElementById('rbtn1');
+        btn.classList.add('loading'); btn.disabled = true;
+        const p = {};
+        for (let i = 1; i <= 166; i++) {
+            const v = document.getElementById('f' + i).value;
+            p['feature_' + i] = v === '' ? 0.0 : parseFloat(v);
+        }
+        try {
+            const r = await fetch('/predict', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(p) });
+            showResult(await r.json());
+        } catch(e) { alert('Error: ' + e.message); }
+        btn.classList.remove('loading'); btn.disabled = false;
+    }
+
+    // ─── NODE ───
+    async function runNode() {
+        const nid = document.getElementById('nid').value;
+        if (!nid) return;
+        const btn = document.getElementById('rbtn3');
+        btn.classList.add('loading'); btn.disabled = true;
+        try {
+            const r = await fetch('/predict/' + nid);
+            if (!r.ok) { alert((await r.json()).detail); btn.classList.remove('loading'); btn.disabled = false; return; }
+            showResult(await r.json());
+        } catch(e) { alert('Error: ' + e.message); }
+        btn.classList.remove('loading'); btn.disabled = false;
+    }
+
+    // ─── CSV ───
+    let csvFile = null;
+    const dz = document.getElementById('dz');
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+    dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if(e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
+
+    function onFile(e) { if(e.target.files.length) setFile(e.target.files[0]); }
+    function setFile(f) {
+        csvFile = f;
+        document.getElementById('fname').textContent = f.name + ' (' + (f.size/1024).toFixed(1) + ' KB)';
+        document.getElementById('ftag').classList.add('show');
+        dz.style.display = 'none';
+        document.getElementById('rbtn2').disabled = false;
+    }
+    function rmFile() {
+        csvFile = null;
+        document.getElementById('csvIn').value = '';
+        document.getElementById('ftag').classList.remove('show');
+        dz.style.display = '';
+        document.getElementById('rbtn2').disabled = true;
+        document.getElementById('batchTile').classList.remove('show');
+    }
+
+    function parseCSV(txt) {
+        const lines = txt.trim().split('\n');
+        const hdr = lines[0].split(',').map(h => h.trim());
+        return lines.slice(1).map(line => {
+            const v = line.split(',').map(x => x.trim());
+            const row = {};
+            hdr.forEach((h, j) => row[h] = parseFloat(v[j]) || 0);
+            return row;
+        });
+    }
+
+    async function runBatch() {
+        if (!csvFile) return;
+        const btn = document.getElementById('rbtn2');
+        btn.classList.add('loading'); btn.disabled = true;
+        const rows = parseCSV(await csvFile.text());
+        const results = [];
+        for (const row of rows) {
+            const p = {};
+            for (let i = 1; i <= 166; i++) p['feature_' + i] = row['feature_' + i] || 0;
+            try {
+                const r = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(p) });
+                results.push(await r.json());
+            } catch(e) { results.push({ fraud_probability:-1, label:'error', confidence:'N/A' }); }
+        }
+
+        const safe = results.filter(r => r.label === 'licit').length;
+        const fraud = results.filter(r => r.label === 'illicit').length;
+
+        let html = `<div class="batch-stats">
+            <div class="bs total"><div class="bsv">${results.length}</div><div class="bsl">Scanned</div></div>
+            <div class="bs safe"><div class="bsv">${safe}</div><div class="bsl">Legitimate</div></div>
+            <div class="bs fraud"><div class="bsv">${fraud}</div><div class="bsl">Fraudulent</div></div>
+        </div><div class="tbl-wrap"><table><thead><tr><th>Row</th><th>Risk</th><th>Verdict</th><th>Confidence</th></tr></thead><tbody>`;
+
+        results.forEach((r, i) => {
+            const cls = r.fraud_probability < 0.3 ? 's' : r.fraud_probability > 0.7 ? 'd' : 'w';
+            const lbl = cls === 's' ? 'LICIT' : cls === 'd' ? 'ILLICIT' : 'REVIEW';
+            html += `<tr><td>${i+1}</td><td>${r.fraud_probability >= 0 ? (r.fraud_probability*100).toFixed(2)+'%' : 'ERR'}</td>
+                <td><span class="tag ${cls}">${lbl}</span></td><td>${r.confidence}</td></tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        document.getElementById('batchContent').innerHTML = html;
+        document.getElementById('batchTile').classList.add('show');
+        btn.classList.remove('loading'); btn.disabled = false;
+    }
+</script>
+</body>
+</html>
