@@ -14,3 +14,17 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Environment secrets
+.env
+
+# ChromaDB persistence (rebuilt from documents at startup)
+knowledge_base/chroma_db/
+
+# Docker wheels (downloaded locally, not committed)
+docker_wheels/
+
+# Test/coverage artifacts
+.pytest_cache/
+htmlcov/
+.coverage

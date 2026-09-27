@@ -1,7 +1,7 @@
 # Dockerfile
 # ==========
 # PURPOSE:
-#   Containerize the FastAPI inference server so it can be deployed anywhere.
+#   Containerize the FastAPI inference server with RAG and LLM support.
 #
 # STRATEGY:
 #   Download large wheels (torch) on the HOST first using pip download,
@@ -12,7 +12,7 @@
 #   2. docker build -t gnn-fraudnet .
 #
 # TO RUN:
-#   docker run -p 8000:8000 gnn-fraudnet
+#   docker run -p 8000:8000 --env-file .env gnn-fraudnet
 
 FROM python:3.11-slim
 
@@ -39,6 +39,9 @@ COPY src/ ./src/
 COPY api/ ./api/
 COPY results/best_graphsage.pt ./results/best_graphsage.pt
 COPY data/processed/elliptic_graph.pt ./data/processed/elliptic_graph.pt
+
+# 4) Create knowledge base directory for ChromaDB persistence
+RUN mkdir -p /app/knowledge_base
 
 EXPOSE 8000
 

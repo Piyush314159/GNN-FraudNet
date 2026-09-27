@@ -2,58 +2,77 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/PyTorch_Geometric-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white"/>
+  <img src="https://img.shields.io/badge/LangGraph-1C3C3C?style=for-the-badge&logo=langgraph&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white"/>
+  <img src="https://img.shields.io/badge/ChromaDB-FF6F00?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white"/>
   <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white"/>
-  <img src="https://img.shields.io/badge/XGBoost-FF6600?style=for-the-badge&logo=xgboost&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
+  <img src="https://img.shields.io/badge/AWS_EC2-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white"/>
 </p>
 
 <p align="center">
-  <b>Graph Neural Network based Bitcoin fraud detection with interactive web dashboard.</b><br/>
-  GraphSAGE · GAT · SHAP + GNNExplainer · REST API · Docker · Interactive UI
+  <b>AI-Powered Fraud Detection & Investigation Platform</b><br/>
+  GNN (GraphSAGE/GAT) · Explainable AI (SHAP/GNNExplainer) · RAG · LLM Reports · LangGraph Agent · FastAPI · Docker · AWS
 </p>
 
 ---
 
 ## 🧠 What Is This?
 
-Traditional ML treats each transaction in isolation. **GNN-FraudNet exploits the graph** — a transaction surrounded by illicit neighbors is far more likely to be illicit itself.
+An end-to-end fraud detection and investigation system that combines **Graph Neural Networks** with **LLM-powered investigation reports**.
 
 ```
- Traditional ML:   "Is THIS transaction suspicious?"   → looks at 166 features of ONE transaction
- GNN (This model): "Is this suspicious GIVEN context?" → looks at the transaction AND its neighbors
+Traditional ML:   "Is THIS transaction suspicious?"   → looks at 166 features of ONE transaction
+GNN (This model): "Is this suspicious GIVEN context?" → looks at the transaction AND its neighbors
+This system:      "WHY is it suspicious?"              → explains, retrieves knowledge, generates report
 ```
 
-This project builds a complete pipeline: **data → training → evaluation → explainability → API → Docker → interactive dashboard**.
+The system goes beyond prediction — it provides a full **investigation pipeline** that an analyst can use to understand and act on fraud detections.
 
 ---
 
 ## 🏗️ Architecture
 
 ```
- ┌─────────────────────────────────────────────────────────────┐
- │                    GNN-FraudNet Pipeline                     │
- ├─────────────────────────────────────────────────────────────┤
- │                                                             │
- │  Elliptic Bitcoin Dataset (203K nodes · 234K edges)         │
- │                      ↓                                      │
- │  Node Features (166) + Edge Index                           │
- │                      ↓                                      │
- │  Normalize · Train/Val/Test Masks · Class Weights           │
- │                      ↓                                      │
- │  ┌────────────────────────────────────────────────┐         │
- │  │  GraphSAGE  ·  GAT  ·  XGBoost  ·  LR  ·  RF │         │
- │  │        5 models trained & compared             │         │
- │  └────────────────────────────────────────────────┘         │
- │                      ↓                                      │
- │  Fraud Probability per Transaction                          │
- │                      ↓                                      │
- │  SHAP + GNNExplainer  ← "Why was this flagged?"             │
- │                      ↓                                      │
- │  FastAPI + Interactive Dashboard + Docker                    │
- │                                                             │
- └─────────────────────────────────────────────────────────────┘
+                          ┌─────────────────────┐
+                          │     Transaction      │
+                          │      (Node ID)       │
+                          └──────────┬──────────┘
+                                     │
+                          ┌──────────▼──────────┐
+                          │   GraphSAGE / GAT   │
+                          │   Fraud Prediction   │
+                          └──────────┬──────────┘
+                                     │
+                          ┌──────────▼──────────┐
+                          │   Investigation      │
+                          │   Context Builder    │
+                          └────┬────────────┬───┘
+                               │            │
+                    ┌──────────▼──┐   ┌─────▼──────────┐
+                    │SHAP / GNN   │   │RAG Retrieval    │
+                    │Explainer    │   │Fraud Knowledge  │
+                    └──────────┬──┘   └─────┬──────────┘
+                               │            │
+                          ┌────▼────────────▼───┐
+                          │      LLM API        │
+                          │  (Google Gemini)     │
+                          └──────────┬──────────┘
+                                     │
+                          ┌──────────▼──────────┐
+                          │  Natural-Language    │
+                          │  Investigation       │
+                          │  Report              │
+                          └─────────────────────┘
 ```
+
+### Agentic Workflow (LangGraph)
+
+```
+predict → explain → analyze_graph → retrieve_knowledge → generate_report
+```
+
+Each step is a LangGraph node. State accumulates as the workflow progresses.
 
 ---
 
@@ -70,7 +89,7 @@ This project builds a complete pipeline: **data → training → evaluation → 
 | Licit (legit) | 42,019 |
 | Unknown | 157,205 |
 
-> 📥 Download → [Kaggle](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)  
+> 📥 Download → [Kaggle](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)
 > Place the 3 CSVs in `data/raw/`
 
 ---
@@ -87,62 +106,62 @@ Test-set metrics from a 70/15/15 split of the labeled nodes:
 | **GraphSAGE** | **0.739** | **0.917** | **0.936** | **✓** |
 | GAT | 0.449 | 0.615 | 0.779 | ✓ |
 
-> **Honest takeaway:** Tree-based baselines (XGBoost, RF) beat GNNs on this dataset because the 166 engineered features already encode neighborhood information. GraphSAGE still demonstrates graph-aware learning and clearly beats linear models. See `notebooks/04_gnn_training.ipynb` for full analysis.
+> **Honest takeaway:** Tree-based baselines (XGBoost, RF) beat GNNs on this dataset because the 166 engineered features already encode neighborhood information. GraphSAGE still demonstrates graph-aware learning and clearly beats linear models.
 
 ---
 
 ## 🚀 Quick Start
 
-### Option 1: Local (Development)
+### Prerequisites
+
+- Python 3.11+
+- [Gemini API key](https://aistudio.google.com) (free — for LLM reports)
+
+### 1. Clone & Setup
 
 ```bash
-# 1. Clone & setup
 git clone https://github.com/Piyush314159/GNN-FraudNet.git
 cd GNN-FraudNet
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install python-dotenv chromadb sentence-transformers google-genai langgraph
+```
 
-# 2. Start the API + interactive dashboard
+### 2. Configure
+
+```bash
+cp .env.example .env
+# Edit .env and add your GEMINI_API_KEY
+```
+
+### 3. Run
+
+```bash
 uvicorn api.main:app --reload --port 8000
 ```
 
-Open **http://localhost:8000** → interactive fraud detection dashboard.
+Open **http://localhost:8000** → interactive dashboard.
 
-### Option 2: Docker (Production)
+### 4. Test the Investigation Endpoint
 
 ```bash
-# 1. Download torch wheel locally (avoids Docker network timeout)
-pip download torch==2.4.0 \
-  --platform manylinux2014_aarch64 \
-  --python-version 311 \
-  --only-binary=:all: \
-  -d ./docker_wheels
-
-# 2. Download torch dependencies
-pip download --no-deps -d ./docker_wheels \
-  filelock typing_extensions sympy networkx jinja2 fsspec "markupsafe" "mpmath==1.3.0"
-
-# 3. Build & run
-docker build -t gnn-fraudnet .
-docker run -p 8000:8000 gnn-fraudnet
+# Investigate a known illicit node
+curl -X POST http://localhost:8000/investigate/42 \
+  -H "Content-Type: application/json" \
+  -d '{"include_shap": false, "explanation_top_k": 10}'
 ```
 
-Open **http://localhost:8000** → same dashboard, now containerized.
+### Docker
 
----
+```bash
+# Build & run
+docker-compose up --build
 
-## 🌐 Interactive Dashboard
-
-The API serves a **cyberpunk-themed web dashboard** at the root URL (`/`):
-
-| Mode | Description |
-|------|-------------|
-| **🔍 Single Transaction** | Enter 166 features manually, use presets (zeros, random, suspicious pattern), get instant fraud prediction with visual gauge |
-| **📁 CSV Batch Upload** | Drag & drop a CSV file — analyzes all transactions and shows results table with summary stats |
-| **🔗 Node Lookup** | Query any node (0–203,768) in the Elliptic graph — uses real graph neighbors for prediction |
-
-**Features:** Ring gauge visualization · Color-coded verdicts (✓ LEGITIMATE / ✗ FRAUDULENT / ? UNCERTAIN) · Batch results table · Live UTC clock · Monospace terminal aesthetic
+# Or manually:
+docker build -t gnn-fraudnet .
+docker run -p 8000:8000 --env-file .env gnn-fraudnet
+```
 
 ---
 
@@ -151,40 +170,45 @@ The API serves a **cyberpunk-themed web dashboard** at the root URL (`/`):
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/` | Interactive fraud detection dashboard |
-| `GET` | `/health` | Health check → `{"status": "ok", "model": "GraphSAGE"}` |
-| `POST` | `/predict` | Predict from 166 raw features (JSON body) |
-| `GET` | `/predict/{node_id}` | Predict for a known node using real graph neighbors |
+| `GET` | `/health` | Health check with service availability |
+| `POST` | `/predict` | Predict from 166 raw features |
+| `GET` | `/predict/{node_id}` | Predict for a known graph node |
+| `POST` | `/investigate/{node_id}` | **Full investigation** — prediction + explanation + RAG + LLM report |
+| `GET` | `/node/{node_id}` | Graph info — degree, neighbors, structural flags |
 
-### Example: Predict from features
-
-```bash
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{"feature_1": 1.5, "feature_2": -0.3, ..., "feature_166": 0.0}'
-```
-
-### Example: Node lookup
-
-```bash
-curl http://localhost:8000/predict/42
-```
-
-### Response
+### Investigation Response
 
 ```json
 {
-  "fraud_probability": 0.0753,
-  "label": "licit",
-  "confidence": "high",
-  "node_id": null
+  "node_id": 42,
+  "prediction": {
+    "fraud_probability": 0.87,
+    "label": "illicit",
+    "confidence": "high",
+    "probabilities": [0.13, 0.87]
+  },
+  "explanation": {
+    "method": "gnn_explainer",
+    "top_features": [
+      {"feature_name": "feature_14", "importance": 0.23, "direction": "increases_fraud", "rank": 1}
+    ]
+  },
+  "graph_analysis": {
+    "total_degree": 12,
+    "neighbors_1hop": {"total": 12, "illicit": 7, "licit": 3, "unknown": 2},
+    "structural_flags": ["high_illicit_concentration"]
+  },
+  "retrieved_context": [
+    {"text": "Mixing services are designed to obscure...", "source": "Fraud Typologies", "relevance_score": 0.82}
+  ],
+  "investigation_report": "## RISK ASSESSMENT\n...",
+  "metadata": {
+    "duration_seconds": 3.45,
+    "model_name": "GraphSAGE",
+    "explanation_method": "gnn_explainer"
+  }
 }
 ```
-
-| Probability | Verdict | Action |
-|:-----------:|---------|--------|
-| < 0.3 | ✅ Licit | Legitimate transaction |
-| 0.3 – 0.7 | ⚠️ Uncertain | Needs manual review |
-| > 0.7 | 🚨 Illicit | Likely fraudulent |
 
 ---
 
@@ -193,108 +217,100 @@ curl http://localhost:8000/predict/42
 ```
 GNN-FraudNet/
 │
-├── data/
-│   ├── raw/                        ← place the 3 Elliptic CSVs here
-│   └── processed/
-│       └── elliptic_graph.pt       ← PyG graph (built by notebook 02)
-│
-├── notebooks/                      ← the executed pipeline (run in order)
-│   ├── 01_eda.ipynb                ← dataset exploration
-│   ├── 02_graph_construction.ipynb ← build + normalize + mask
-│   ├── 03_baseline_models.ipynb    ← LogReg / RF / XGBoost
-│   └── 04_gnn_training.ipynb       ← GraphSAGE / GAT + explainability
-│
-├── src/                            ← reusable importable modules
-│   ├── data_loader.py              ← CSVs → PyG Data object
-│   ├── graph_builder.py            ← normalize · masks · class weights
-│   ├── train.py                    ← training loop + early stopping
-│   ├── evaluate.py                 ← F1 · PR-AUC · comparison table
-│   ├── explain.py                  ← GNNExplainer + SHAP
-│   └── models/
-│       ├── graphsage.py            ← GraphSAGE model
-│       ├── gat.py                  ← GAT model
-│       └── baseline.py             ← LogReg / RF / XGBoost
+├── src/
+│   ├── config.py                    ← centralized configuration
+│   ├── models/
+│   │   ├── graphsage.py             ← GraphSAGE model
+│   │   ├── gat.py                   ← GAT model
+│   │   └── baseline.py              ← LogReg / RF / XGBoost
+│   ├── services/
+│   │   ├── prediction.py            ← model inference service
+│   │   ├── explainability.py        ← SHAP / GNNExplainer wrapper
+│   │   ├── graph_analysis.py        ← neighbor & structural analysis
+│   │   └── investigation.py         ← investigation context builder
+│   ├── rag/
+│   │   ├── knowledge_base.py        ← ChromaDB vector store
+│   │   ├── retriever.py             ← semantic search
+│   │   └── documents/               ← fraud knowledge markdown files
+│   ├── llm/
+│   │   ├── prompts.py               ← anti-hallucination prompt templates
+│   │   └── report_generator.py      ← Gemini API integration
+│   ├── agents/
+│   │   └── investigation_agent.py   ← LangGraph workflow
+│   ├── data_loader.py               ← CSV → PyG Data
+│   ├── graph_builder.py             ← normalization & masks
+│   ├── train.py                     ← training loop
+│   ├── evaluate.py                  ← metrics & comparison
+│   └── explain.py                   ← GNNExplainer + SHAP
 │
 ├── api/
-│   ├── main.py                     ← FastAPI app + dashboard serving
-│   ├── schema.py                   ← Pydantic request/response models
-│   └── static/
-│       └── index.html              ← interactive web dashboard
+│   ├── main.py                      ← FastAPI app + all endpoints
+│   ├── schema.py                    ← Pydantic request/response models
+│   └── static/index.html            ← interactive dashboard
 │
-├── results/
-│   ├── metrics.json                ← final metrics (all 5 models)
-│   ├── best_graphsage.pt           ← trained model weights
-│   ├── best_gat.pt                 ← trained GAT weights
-│   └── plots/                      ← EDA, graph, baseline, GNN visualizations
+├── tests/                           ← pytest test suite
+├── notebooks/                       ← research pipeline (4 notebooks)
+├── data/                            ← raw CSVs + processed graph
+├── results/                         ← trained models + metrics
 │
-├── docker_wheels/                  ← pre-downloaded torch wheels (for Docker build)
 ├── Dockerfile
-├── requirements.txt
-├── requirements-docker.txt         ← minimal deps for inference-only container
-├── check_transaction.py            ← standalone script to test predictions
-├── test_predict.py                 ← API smoke test
+├── docker-compose.yml
+├── .github/workflows/ci.yml         ← GitHub Actions CI
+├── .env.example                     ← environment template
 └── README.md
 ```
 
 ---
 
-## 🔬 Running the Full Pipeline
-
-The pipeline was built as four notebooks. Run them **in order**:
+## 🧪 Testing
 
 ```bash
-jupyter lab notebooks/
+# Run all tests
+python -m pytest tests/ -v
+
+# Run specific test file
+python -m pytest tests/test_prediction.py -v
+
+# Run with coverage
+python -m pytest tests/ --cov=src --cov=api
 ```
 
-| # | Notebook | What It Does | Output |
-|---|----------|--------------|--------|
-| 1 | `01_eda.ipynb` | Explores raw CSVs — label distribution, class imbalance, correlations | `results/plots/eda/` |
-| 2 | `02_graph_construction.ipynb` | Builds PyG `Data` object, normalizes features, creates masks | `data/processed/elliptic_graph.pt` |
-| 3 | `03_baseline_models.ipynb` | Trains LogReg, Random Forest, XGBoost (no graph) | `results/baseline_metrics.json` |
-| 4 | `04_gnn_training.ipynb` | Trains GraphSAGE & GAT, runs GNNExplainer on illicit nodes | `results/best_graphsage.pt` |
-
-> **Tip:** All notebooks have pre-rendered outputs — open them to see results without re-executing.
+Tests use synthetic 50-node graphs — no need for the real dataset.
 
 ---
 
-## 🐛 Challenges & Solutions
+## ☁️ AWS Deployment
 
-Building this project involved several non-trivial issues. Here's what we hit and how we solved each:
+### Architecture
 
-### 1. Docker Network Timeout
+```
+User → AWS EC2 (t3.medium) → Docker → FastAPI → GNN + RAG + Gemini API
+```
 
-| Problem | `pip install torch==2.4.0` inside Docker timed out repeatedly — the 90 MB wheel kept failing due to Docker's slow virtual network on macOS ARM64 |
-|---------|---|
-| **Error** | `ReadTimeoutError: HTTPSConnectionPool(host='files.pythonhosted.org')` |
-| **Solution** | Downloaded the torch wheel locally using `curl -L -C -` (with resume support), then copied it into the Docker image using `COPY docker_wheels/ /tmp/wheels/` and installed with `--no-index --find-links` |
+### Steps
 
-### 2. Dependency Version Conflict (mpmath)
+1. **Launch EC2** (Ubuntu 22.04, t3.medium, 30GB EBS)
+2. **Install Docker**:
+   ```bash
+   sudo apt update && sudo apt install -y docker.io docker-compose
+   sudo usermod -aG docker $USER
+   ```
+3. **Transfer files**:
+   ```bash
+   scp -r GNN-FraudNet/ ec2-user@<IP>:~/
+   ```
+4. **Configure**:
+   ```bash
+   cp .env.example .env
+   # Add GEMINI_API_KEY
+   ```
+5. **Run**:
+   ```bash
+   docker-compose up -d
+   ```
+6. **Security Group**: Allow inbound TCP on port 8000 (or 80 with nginx reverse proxy)
 
-| Problem | `sympy` (required by torch) needs `mpmath<1.4`, but pip downloaded `mpmath==1.4.1` |
-|---------|---|
-| **Error** | `ERROR: No matching distribution found for mpmath<1.4,>=1.1.0` |
-| **Solution** | Manually downloaded `mpmath==1.3.0` into `docker_wheels/` and removed the 1.4.1 version |
-
-### 3. torch_scatter Build Failure
-
-| Problem | `torch_scatter` requires compilation from source and needs torch available during `setup.py`, but pip's isolated build environment doesn't have torch |
-|---------|---|
-| **Error** | `ModuleNotFoundError: No module named 'torch'` during `Getting requirements to build wheel` |
-| **Solution** | Removed `torch_scatter` and `torch_sparse` from Docker requirements — PyG 2.8+ makes them optional. The API works without them |
-
-### 4. sklearn Import Crash in Docker
-
-| Problem | `src/models/__init__.py` imported baseline models (sklearn, xgboost) which aren't installed in the inference-only Docker image |
-|---------|---|
-| **Error** | `ModuleNotFoundError: No module named 'sklearn'` |
-| **Solution** | Wrapped baseline imports in `try/except ImportError` — the API only needs GraphSAGE, not baselines |
-
-### 5. Port Already in Use
-
-| Problem | Starting a second server while one is already running |
-|---------|---|
-| **Error** | `[Errno 48] Address already in use` |
-| **Solution** | Kill the existing process with `lsof -i :8000` → `kill <PID>`, or use a different port: `--port 8001` |
+> **Cost**: t3.medium ≈ $0.042/hr (~$30/month). Use a spot instance for ~$10/month.
 
 ---
 
@@ -306,19 +322,42 @@ Building this project involved several non-trivial issues. Here's what we hit an
 | Deep Learning | PyTorch 2.4.0 |
 | Baseline Models | XGBoost · Random Forest · scikit-learn |
 | Explainability | SHAP · GNNExplainer |
+| RAG | ChromaDB · sentence-transformers |
+| LLM | Google Gemini (gemini-2.0-flash) |
+| Agentic Workflow | LangGraph |
 | API | FastAPI · Uvicorn |
 | Frontend | Vanilla HTML/CSS/JS (cyberpunk dashboard) |
-| Deployment | Docker |
-| Visualization | Matplotlib · Seaborn · NetworkX |
+| Deployment | Docker · Docker Compose · AWS EC2 |
+| CI/CD | GitHub Actions |
+| Testing | pytest |
+
+---
+
+## 🔬 Running the Full ML Pipeline
+
+The ML pipeline was built as four notebooks. Run them **in order**:
+
+```bash
+jupyter lab notebooks/
+```
+
+| # | Notebook | What It Does |
+|---|----------|--------------|
+| 1 | `01_eda.ipynb` | Dataset exploration |
+| 2 | `02_graph_construction.ipynb` | Build PyG Data object |
+| 3 | `03_baseline_models.ipynb` | Train LogReg / RF / XGBoost |
+| 4 | `04_gnn_training.ipynb` | Train GraphSAGE / GAT + explainability |
+
+> **Tip:** All notebooks have pre-rendered outputs — open them to see results without re-executing.
 
 ---
 
 ## 🔗 Background
 
-This project bridges **particle physics and fintech**.  
-The GNN message-passing framework applied here originates from work on the  
-[Belle II experiment](https://www.belle2.org/) — where GNNs reconstruct  
-particle decay trees from detector hits.  
+This project bridges **particle physics and fintech**.
+The GNN message-passing framework applied here originates from work on the
+[Belle II experiment](https://www.belle2.org/) — where GNNs reconstruct
+particle decay trees from detector hits.
 The same structural reasoning applies to financial transaction graphs.
 
 ---

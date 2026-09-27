@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - MODEL_PATH=results/best_graphsage.pt
+      - DATA_PATH=data/processed/elliptic_graph.pt
+      - CHROMA_DB_PATH=knowledge_base/chroma_db
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./knowledge_base:/app/knowledge_base
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
