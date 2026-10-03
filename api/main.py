@@ -23,7 +23,7 @@ from typing import Optional
 
 import torch
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.schema import (
@@ -258,6 +258,38 @@ def investigate_node(
         raise HTTPException(status_code=500, detail=f"Investigation failed: {e}")
 
     return _format_investigation_response(result)
+
+
+@app.get("/investigate/stream/{node_id}")
+def investigate_node_stream(
+    node_id: int,
+    include_shap: bool = False,
+    explanation_top_k: int = 10,
+):
+    """
+    Stream investigation results (SSE).
+    Orchestrates: GNN prediction → explainability → graph analysis →
+    RAG retrieval → LLM report generation (streamed).
+    """
+    agent = app.state.investigation_agent
+    if agent is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Investigation agent not available. Check server logs.",
+        )
+
+    data = app.state.data
+    if node_id < 0 or node_id >= data.num_nodes:
+        raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
+
+    return StreamingResponse(
+        agent.investigate_stream(
+            node_id=node_id,
+            include_shap=include_shap,
+            explanation_top_k=explanation_top_k,
+        ),
+        media_type="text/event-stream"
+    )
 
 
 @app.get("/node/{node_id}")

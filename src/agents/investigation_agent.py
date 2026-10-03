@@ -260,3 +260,56 @@ class InvestigationAgent:
             "errors": result.get("errors", []),
             "duration_seconds": round(duration, 3),
         }
+
+    def investigate_stream(self, node_id: int, include_shap: bool = False, explanation_top_k: int = 10):
+        """Yields SSE-compatible progress and report chunks."""
+        import json
+        
+        yield f'data: {json.dumps({"type": "status", "message": "Predicting node fraud probability..."})}\n\n'
+        
+        state: InvestigationState = {
+            "node_id": node_id,
+            "include_shap": include_shap,
+            "explanation_top_k": explanation_top_k,
+            "errors": [],
+        }
+        
+        # Step 1: Predict
+        state.update(self._step_predict(state))
+        
+        # Step 2: Explain
+        yield f'data: {json.dumps({"type": "status", "message": "Extracting subgraph and explaining decisions..."})}\n\n'
+        state.update(self._step_explain(state))
+        
+        # Step 3: Graph Analysis
+        yield f'data: {json.dumps({"type": "status", "message": "Analyzing structural graph neighborhood..."})}\n\n'
+        state.update(self._step_graph(state))
+        
+        # Step 4: RAG Retrieval
+        yield f'data: {json.dumps({"type": "status", "message": "Retrieving fraud typologies from vector DB..."})}\n\n'
+        state.update(self._step_rag(state))
+        
+        # Step 5: LLM Stream
+        yield f'data: {json.dumps({"type": "status", "message": "Generating final investigation report..."})}\n\n'
+        
+        context = InvestigationContext(
+            node_id=node_id,
+            prediction=state.get("prediction"),
+            explanation=state.get("explanation"),
+            graph_analysis=state.get("graph_analysis"),
+            errors=state.get("errors", []),
+        )
+        retrieved_docs = state.get("retrieved_docs", [])
+        
+        if self.report_generator is None:
+            from src.llm.report_generator import ReportGenerator
+            sections = self.investigation_service.format_context_for_llm(context)
+            report = ReportGenerator._fallback_report(context, sections)
+            yield f'data: {json.dumps({"type": "chunk", "text": report})}\n\n'
+        else:
+            for chunk in self.report_generator.generate_report_stream(
+                context, retrieved_docs, self.investigation_service
+            ):
+                yield f'data: {json.dumps({"type": "chunk", "text": chunk})}\n\n'
+        
+        yield f'data: {json.dumps({"type": "done"})}\n\n'

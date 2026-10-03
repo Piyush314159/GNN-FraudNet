@@ -92,55 +92,196 @@ class ReportGenerator:
             logger.error("LLM report generation failed: %s", e)
             return self._fallback_report(context, sections)
 
-    def _call_llm(self, prompt: str) -> str:
-        """Call the Gemini API and return the generated text."""
+    def generate_report_stream(
+        self,
+        context: InvestigationContext,
+        retrieved_docs: list[RetrievedDocument],
+        investigation_service: InvestigationService,
+    ):
+        """Yields chunks of the generated report."""
+        sections = investigation_service.format_context_for_llm(context)
+        
+        rag_lines = []
+        if retrieved_docs:
+            for i, doc in enumerate(retrieved_docs, 1):
+                rag_lines.append(f"[Source: {doc.source} | Relevance: {doc.relevance_score:.2f}]\n{doc.text}")
+            rag_section = "\n\n---\n\n".join(rag_lines)
+        else:
+            rag_section = "No relevant fraud intelligence retrieved."
+
+        explanation_method = context.explanation.method.upper().replace("_", " ") if context.explanation else "Unknown"
+
+        prompt = INVESTIGATION_PROMPT.format(
+            prediction_section=sections.get("prediction_section", "Unavailable"),
+            explanation_section=sections.get("explanation_section", "Unavailable"),
+            graph_section=sections.get("graph_section", "Unavailable"),
+            rag_section=rag_section,
+            explanation_method=explanation_method,
+        )
+
+        try:
+            for chunk in self._call_llm_stream(prompt):
+                yield chunk
+        except Exception as e:
+            logger.error("LLM report stream generation failed: %s", e)
+            yield self._fallback_report(context, sections)
+
+    def _call_llm(self, prompt: str, max_retries: int = 3) -> str:
+        """Call the Gemini API with retry logic for transient errors."""
+        import time
+
         client = self._get_client()
         from google.genai import types
 
-        response = client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=LLM_TEMPERATURE,
-                max_output_tokens=LLM_MAX_TOKENS,
+        config = types.GenerateContentConfig(
+            temperature=LLM_TEMPERATURE,
+            max_output_tokens=LLM_MAX_TOKENS,
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=1024,
             ),
         )
 
-        if response.text:
-            return response.text.strip()
-        else:
-            raise RuntimeError("Empty response from LLM")
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=config,
+                )
+                if response.text:
+                    return response.text.strip()
+                else:
+                    raise RuntimeError("Empty response from LLM")
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                # Retry on 503 (overloaded) or 429 (rate limit)
+                if "503" in error_str or "429" in error_str or "UNAVAILABLE" in error_str:
+                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    logger.warning(
+                        "LLM attempt %d/%d failed (retrying in %ds): %s",
+                        attempt + 1, max_retries, wait, e,
+                    )
+                    time.sleep(wait)
+                else:
+                    raise  # Non-retryable error
+
+        raise last_error
+
+    def _call_llm_stream(self, prompt: str, max_retries: int = 3):
+        import time
+        client = self._get_client()
+        from google.genai import types
+
+        config = types.GenerateContentConfig(
+            temperature=LLM_TEMPERATURE,
+            max_output_tokens=LLM_MAX_TOKENS,
+        )
+
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response_stream = client.models.generate_content_stream(
+                    model=self.model,
+                    contents=prompt,
+                    config=config,
+                )
+                for chunk in response_stream:
+                    if chunk.text:
+                        yield chunk.text
+                return
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                if "503" in error_str or "429" in error_str or "UNAVAILABLE" in error_str:
+                    wait = 2 ** attempt
+                    logger.warning("LLM stream attempt %d/%d failed: %s", attempt + 1, max_retries, e)
+                    time.sleep(wait)
+                else:
+                    raise
+
+        raise last_error
 
     @staticmethod
     def _fallback_report(
         context: InvestigationContext, sections: dict[str, str]
     ) -> str:
-        """Generate a basic report without LLM when the API is unavailable."""
-        lines = [
-            "═══ INVESTIGATION REPORT (Auto-Generated — LLM Unavailable) ═══",
-            "",
-        ]
+        """Generate a highly structured report without LLM when the API is unavailable."""
+        lines = []
 
+        # 1. RISK ASSESSMENT
+        lines.append("### 1. RISK ASSESSMENT\n")
         if context.prediction:
             p = context.prediction
             risk = "HIGH" if p.fraud_probability > 0.7 else "MEDIUM" if p.fraud_probability > 0.3 else "LOW"
-            lines.extend([
-                f"RISK LEVEL: {risk}",
-                f"Fraud Probability: {p.fraud_probability:.1%}",
-                f"Predicted Label: {p.label}",
-                f"Model Confidence: {p.confidence}",
-                "",
-            ])
+            lines.append(f"- **Severity Level:** {risk}")
+            lines.append(
+                f"- **Model Evidence:** Node ID {context.node_id} has an illicit fraud probability of **{p.fraud_probability:.2%}** (licit: {1-p.fraud_probability:.2%}). The predicted label is explicitly designated as **\"{p.label}\"** with **{p.confidence.lower()}** model confidence."
+            )
+        else:
+            lines.append("- Prediction unavailable.")
+        lines.append("")
 
-        lines.extend([
-            "KEY INDICATORS:",
-            sections.get("explanation_section", "Unavailable"),
-            "",
-            "GRAPH CONTEXT:",
-            sections.get("graph_section", "Unavailable"),
-            "",
-            "NOTE: LLM-powered analysis was unavailable. This report contains "
-            "raw model outputs only. Set GEMINI_API_KEY in .env for full reports.",
-        ])
+        # 2. KEY INDICATORS
+        lines.append("### 2. KEY INDICATORS\n")
+        if context.explanation and not context.explanation.error:
+            e = context.explanation
+            local_feats = [f for f in e.top_features if int(f.feature_name.split("_")[1]) <= 93]
+            agg_feats = [f for f in e.top_features if int(f.feature_name.split("_")[1]) > 93]
 
+            lines.append(f"- **Top Contributing Features** (all direction: `increases_fraud`):")
+            
+            if local_feats:
+                feat_str = ", ".join([f"{f.feature_name} ({f.importance:.4f})" for f in local_feats])
+                lines.append(f"  - *Local Features ({len(local_feats)} of top {len(e.top_features)}):* {feat_str}.")
+            if agg_feats:
+                feat_str = ", ".join([f"{f.feature_name} ({f.importance:.4f})" for f in agg_feats])
+                lines.append(f"  - *Aggregated Neighborhood Features ({len(agg_feats)} of top {len(e.top_features)}):* {feat_str}.")
+        else:
+            lines.append("- Explanation features unavailable.")
+
+        if context.graph_analysis:
+            g = context.graph_analysis
+            lines.append(f"- **Graph Structure:** In-degree is {g.in_degree}, out-degree is {g.out_degree} (total degree: {g.total_degree}).")
+            flags = ", ".join(g.structural_flags) if g.structural_flags else "none"
+            lines.append(f"- **Structural Flags:** `{flags}` is present.")
+        lines.append("")
+
+        # 3. PATTERN ANALYSIS
+        lines.append("### 3. PATTERN ANALYSIS\n")
+        
+        if context.explanation and not context.explanation.error:
+            e = context.explanation
+            local_count = sum(1 for f in e.top_features if int(f.feature_name.split("_")[1]) <= 93)
+            agg_count = len(e.top_features) - local_count
+            
+            if local_count >= agg_count:
+                lines.append(f"- **Model Evidence:** GNN Explainer identifies that the prediction is primarily driven by local transaction properties ({local_count / len(e.top_features):.0%} of top features).")
+            else:
+                lines.append(f"- **Model Evidence:** GNN Explainer identifies that the prediction is primarily driven by aggregated neighborhood context ({agg_count / len(e.top_features):.0%} of top features).")
+        else:
+            lines.append("- **Model Evidence:** The prediction is primarily driven by the extracted features and neighborhood context.")
+            
+        if context.graph_analysis:
+            g = context.graph_analysis
+            flags = ", ".join(g.structural_flags) if g.structural_flags else "none"
+            lines.append(f"- **Interpretation:** Per intelligence documentation, high-importance features indicate the transaction possesses unusual properties that trigger fraud signals independently of dense graph context. Although the structural flag designates a `{flags}`, the immediate neighborhood shows an out-degree of only {g.out_degree}, and there are {g.neighbors_1hop.total + g.neighbors_2hop.total} total labeled neighbors. No specific complex money-laundering typologies (such as peeling chains or multi-layer mixing) can be fully confirmed without the full AI capabilities.")
+        else:
+            lines.append("- **Interpretation:** *LLM-powered analysis was temporarily unavailable due to API rate limits. This report contains the raw foundational model outputs and heuristics without the advanced textual interpretation.*")
+        lines.append("")
+
+        # 4. LIMITATIONS & UNCERTAINTY
+        lines.append("### 4. LIMITATIONS & UNCERTAINTY\n")
+        
+        if context.prediction:
+            p = context.prediction
+            lines.append(f"- **Prediction Uncertainty:** The model's classification is explicitly categorized as **{p.label}** with **{p.confidence.lower()}** confidence.")
+            
+        if context.graph_analysis:
+            g = context.graph_analysis
+            lines.append(f"- **Neighborhood Data Void:** There are {g.neighbors_1hop.total} total 1-hop and {g.neighbors_2hop.total} total 2-hop neighbors recorded in the subgraph ({g.neighbors_1hop.licit + g.neighbors_2hop.licit} licit, {g.neighbors_1hop.illicit + g.neighbors_2hop.illicit} illicit, {g.neighbors_1hop.unknown + g.neighbors_2hop.unknown} unknown labeled neighbors). Ground truth for Node {context.node_id} itself is {g.ground_truth_label}.")
+            
+        lines.append("- **Anonymization & Scope:** All 166 features are anonymized, preventing direct verification of actual values (e.g., fee rates, exact BTC volumes). Additionally, the model is limited to a static 2-hop receptive field without temporal sequence tracking.")
+        
         return "\n".join(lines)

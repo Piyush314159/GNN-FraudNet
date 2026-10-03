@@ -4,7 +4,7 @@ explainability.py
 Explainability service — wraps SHAP/GNNExplainer into API-callable functions
 that return structured dictionaries instead of raw tensors.
 
-Imports and calls functions from the existing src/explain.py without modifying it.
+Uses k-hop subgraph extraction to make GNNExplainer fast on large graphs.
 """
 import logging
 from dataclasses import dataclass, field
@@ -12,6 +12,8 @@ from typing import Optional
 
 import numpy as np
 import torch
+from torch_geometric.data import Data
+from torch_geometric.utils import k_hop_subgraph
 
 from src.config import NUM_FEATURES
 
@@ -47,23 +49,66 @@ class ExplainabilityService:
         self.model = model
         self.data = data
 
+    def _extract_subgraph(self, node_id: int, num_hops: int = 2) -> tuple[Data, int]:
+        """
+        Extract a k-hop subgraph around node_id.
+
+        Returns a new Data object containing only the subgraph,
+        and the relabeled index of the target node within it.
+        This makes GNNExplainer run on ~100 nodes instead of 203K.
+        """
+        subset, sub_edge_index, mapping, _ = k_hop_subgraph(
+            node_id, num_hops, self.data.edge_index, relabel_nodes=True
+        )
+
+        sub_data = Data(
+            x=self.data.x[subset],
+            edge_index=sub_edge_index,
+            y=self.data.y[subset],
+        )
+        target_idx = mapping[0].item()
+        logger.debug(
+            "Subgraph: %d nodes, %d edges (target relabeled to %d)",
+            sub_data.x.size(0), sub_data.edge_index.size(1), target_idx,
+        )
+        return sub_data, target_idx
+
     def explain_node_gnn(
         self, node_id: int, top_k: int = 10, epochs: int = 200
     ) -> ExplanationResult:
         """
-        Run GNNExplainer on a single node and return structured results.
+        Run GNNExplainer on a single node using a 2-hop subgraph.
 
-        Uses src.explain.run_gnn_explainer() internally.
+        Uses the existing GNNExplainer setup but on a small subgraph
+        instead of the full 203K-node graph, reducing time from minutes
+        to seconds.
         """
         try:
-            from src.explain import run_gnn_explainer
+            from torch_geometric.explain import Explainer, GNNExplainer
 
-            node_mask, edge_mask = run_gnn_explainer(
-                self.model, self.data, node_id, epochs=epochs
+            # Extract small subgraph for fast explanation
+            sub_data, target_idx = self._extract_subgraph(node_id, num_hops=2)
+
+            explainer = Explainer(
+                model=self.model,
+                algorithm=GNNExplainer(epochs=epochs, lr=0.01),
+                explanation_type="model",
+                node_mask_type="attributes",
+                edge_mask_type="object",
+                model_config=dict(
+                    mode="multiclass_classification",
+                    task_level="node",
+                    return_type="log_probs",
+                ),
             )
 
+            explanation = explainer(
+                sub_data.x, sub_data.edge_index, index=target_idx
+            )
+            node_mask = explanation.node_mask
+            edge_mask = explanation.edge_mask
+
             # node_mask shape: (num_nodes, num_features) or (1, num_features)
-            # We want the feature importances for the target node
             if node_mask.dim() == 2:
                 feature_importance = node_mask.mean(dim=0).detach().cpu().numpy()
             else:
@@ -75,7 +120,11 @@ class ExplainabilityService:
                 node_id=node_id,
                 method="gnn_explainer",
                 top_features=top_features,
-                edge_importances=edge_mask.detach().cpu().tolist() if edge_mask is not None else None,
+                edge_importances=(
+                    edge_mask.detach().cpu().tolist()
+                    if edge_mask is not None
+                    else None
+                ),
                 raw_feature_mask=feature_importance.tolist(),
             )
         except Exception as e:
