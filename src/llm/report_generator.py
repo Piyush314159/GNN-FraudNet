@@ -205,7 +205,7 @@ class ReportGenerator:
 
     @staticmethod
     def _fallback_report(
-        context: InvestigationContext, sections: dict[str, str]
+        context: InvestigationContext, sections: dict[str, str], retrieved_docs: list = None
     ) -> str:
         """Generate a highly structured report without LLM when the API is unavailable."""
         lines = []
@@ -284,4 +284,32 @@ class ReportGenerator:
             
         lines.append("- **Anonymization & Scope:** All 166 features are anonymized, preventing direct verification of actual values (e.g., fee rates, exact BTC volumes). Additionally, the model is limited to a static 2-hop receptive field without temporal sequence tracking.")
         
+        # 5. RECOMMENDED ACTIONS
+        lines.append("")
+        lines.append("### 5. RECOMMENDED ACTIONS\n")
+        lines.append("- **Action 1 - Feature Validation:** Cross-reference the highly-weighted local features (e.g. amounts, timestamps, or velocity metrics) with the internal exchange database to check for known illicit thresholds.")
+        
+        if context.graph_analysis:
+            g = context.graph_analysis
+            if g.out_degree > 0:
+                lines.append(f"- **Action 2 - Counterparty KYC:** Investigate the {g.out_degree} receiving counterparties (out-degree). Determine if they belong to unregulated exchanges or known darknet markets.")
+            elif g.in_degree > 0:
+                lines.append(f"- **Action 3 - Source of Funds:** Trace the {g.in_degree} incoming transactions to verify the source of funds. Check if any incoming addresses are blacklisted.")
+            else:
+                lines.append("- **Action 2 - Neighborhood Expansion:** Expand the subgraph search beyond 2-hops to look for connections to known sanctioned entities.")
+        
+        lines.append("- **Action 4 - Watchlist:** Temporarily flag this transaction and related wallets for enhanced monitoring pending manual review.")
+
+        # 6. INVESTIGATOR Q&A
+        lines.append("")
+        lines.append("### 6. INVESTIGATOR Q&A\n")
+        
+        if retrieved_docs and len(retrieved_docs) > 0:
+            lines.append("- **Follow-up Inquiry 1:** Based on retrieved intelligence, does this node exhibit behavior similar to the known typology: *\"" + retrieved_docs[0].text[:80].replace('\n', ' ') + "...\"*?")
+            if len(retrieved_docs) > 1:
+                lines.append(f"- **Follow-up Inquiry 2:** Could the structural flags (`{flags if 'flags' in locals() else 'none'}`) be indicative of the pattern described in RAG Document [{retrieved_docs[1].chunk_id}]?")
+        else:
+            lines.append("- **Follow-up Inquiry:** What real-world entities do the anomalous high-importance features correspond to?")
+            lines.append("- **Follow-up Inquiry:** Are there any known darknet market addresses within a 3-hop radius of this node?")
+
         return "\n".join(lines)

@@ -304,7 +304,7 @@ class InvestigationAgent:
         if self.report_generator is None:
             from src.llm.report_generator import ReportGenerator
             sections = self.investigation_service.format_context_for_llm(context)
-            report = ReportGenerator._fallback_report(context, sections)
+            report = ReportGenerator._fallback_report(context, sections, retrieved_docs)
             yield f'data: {json.dumps({"type": "chunk", "text": report})}\n\n'
         else:
             for chunk in self.report_generator.generate_report_stream(
