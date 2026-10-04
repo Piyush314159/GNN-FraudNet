@@ -1,0 +1,628 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\definecolor{codegray}{gray}{0.95}
+\definecolor{darkblue}{RGB}{25,55,95}
+\definecolor{darkgreen}{RGB}{25,100,65}
+
+\lstset{
+backgroundcolor=\color{codegray},
+basicstyle=\ttfamily\small,
+breaklines=true,
+frame=single,
+columns=fullflexible,
+keepspaces=true,
+showstringspaces=false,
+tabsize=2
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{GNN-FraudNet}
+\rhead{AWS Deployment Report}
+\cfoot{\thepage}
+
+\titleformat{\section}{\Large\bfseries\color{darkblue}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries\color{darkgreen}}{\thesubsection}{0.7em}{}
+
+\title{\textbf{GNN-FraudNet}\\\large AWS EC2 Deployment, Troubleshooting, and Productionization Report}
+\author{Piyush Maji\\MSc Physics, IIT Hyderabad}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report documents the complete deployment of GNN-FraudNet from a local development environment to a publicly accessible AWS EC2 service. The system combines GraphSAGE, GNNExplainer, graph analysis, ChromaDB-based RAG, LangGraph orchestration, an LLM report generator, FastAPI, Docker, and Nginx.
+
+The deployment exposed several real engineering problems: unreliable SSH connectivity, missing large model/data artifacts, an architecture-mismatched PyTorch wheel, CUDA dependency problems, Python package incompatibilities, Gemini free-tier quota exhaustion, and the need for a secure reverse-proxy architecture. Each issue was diagnosed from concrete build output or runtime logs and resolved without exposing API secrets.
+
+The final service successfully performs the complete investigation workflow through a public dashboard. A representative investigation completed in approximately 3.73 seconds using Groq's \texttt{openai/gpt-oss-120b}, with GraphSAGE, GNNExplainer, graph analysis, and ChromaDB RAG functioning end-to-end.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Project Overview}
+GNN-FraudNet is an end-to-end fraud detection and investigation platform. The project moves beyond simple classification by answering three increasingly useful questions:
+\begin{enumerate}
+\item Is this transaction suspicious?
+\item Is it suspicious given its graph context?
+\item Why is it suspicious, and how should an analyst interpret it?
+\end{enumerate}
+
+The Elliptic Bitcoin dataset used by the project contains 203,769 transaction nodes, 234,355 edges, and 166 features per node. The documented labels include 4,545 illicit nodes, 42,019 licit nodes, and 157,205 unknown nodes.
+
+The investigation workflow is:
+\begin{center}
+\texttt{predict $\rightarrow$ explain $\rightarrow$ analyze\_graph $\rightarrow$ retrieve\_knowledge $\rightarrow$ generate\_report}
+\end{center}
+
+The repository separates model inference, explainability, graph analysis, RAG, LLM generation, agent orchestration, and API serving. The documented stack includes PyTorch Geometric, PyTorch, SHAP/GNNExplainer, ChromaDB, sentence-transformers, LangGraph, FastAPI/Uvicorn, Docker, Docker Compose, and AWS EC2.
+
+\section{Deployment Objective}
+The objective was to make the locally working application available as a real publicly reachable service.
+
+The final architecture is:
+\begin{lstlisting}
+Internet
+   |
+AWS Security Group
+   |
+HTTP/HTTPS
+   |
+Nginx
+   |
+127.0.0.1:8000
+   |
+Docker
+   |
+FastAPI
+   |
+LangGraph Investigation Agent
+   |
++----------+----------+----------+----------+
+| GraphSAGE| GNNExp   | Graph    | ChromaDB |
+|          |          | Analysis | RAG      |
++----------+----------+----------+----------+
+                         |
+                      Groq LLM
+                         |
+                 Investigation Report
+\end{lstlisting}
+
+A key deployment decision was to bind Docker port 8000 only to localhost:
+\begin{lstlisting}
+ports:
+  - "127.0.0.1:8000:8000"
+\end{lstlisting}
+Nginx is therefore the public entry point.
+
+\section{Final AWS Environment}
+The actual EC2 deployment used:
+\begin{itemize}
+\item Ubuntu Server 24.04 LTS, x86\_64;
+\item EC2 instance type \texttt{m7i-flex.large};
+\item 2 vCPUs and 8 GiB RAM;
+\item approximately 30 GiB root EBS volume;
+\item Docker and Docker Compose;
+\item Nginx reverse proxy.
+\end{itemize}
+
+The repository README contains a generic AWS example using a t3.medium. The actual deployed machine was \texttt{m7i-flex.large}.
+
+SSH port 22 was restricted to the current client IP. Public HTTP was served through port 80, while direct public access to application port 8000 was removed.
+
+\section{Problem 1: SSH Connectivity and Broken Pipes}
+\subsection{Observed Problem}
+AWS Instance Connect was unreliable and direct SSH from the original network experienced connection failures and ``Broken pipe'' behavior.
+
+\subsection{Diagnosis}
+The EC2 instance was reachable from another network, indicating that the problem was primarily a client-network/path issue rather than an Ubuntu or Docker problem.
+
+The practical solution was to connect through a phone hotspot. SSH keep-alive parameters were also used:
+\begin{lstlisting}
+ssh -o ServerAliveInterval=30 \
+    -o ServerAliveCountMax=3 \
+    -i ~/Downloads/gnn-key.pem \
+    ubuntu@<EC2_PUBLIC_IP>
+\end{lstlisting}
+
+\subsection{Security}
+The SSH security-group rule was restricted to:
+\begin{lstlisting}
+TCP 22 -> <CURRENT_CLIENT_IP>/32
+\end{lstlisting}
+rather than opening SSH to the entire Internet.
+
+\section{Problem 2: Missing Large Graph Artifact}
+\subsection{Observed Problem}
+The initial Docker build failed because the Dockerfile expected:
+\begin{lstlisting}
+data/processed/elliptic_graph.pt
+\end{lstlisting}
+but the graph artifact was not present on EC2.
+
+\subsection{Solution}
+The graph was transferred with SCP:
+\begin{lstlisting}
+scp -i ~/Downloads/gnn-key.pem \
+~/Desktop/Project/GNN-FraudNet/data/processed/elliptic_graph.pt \
+ubuntu@<EC2_PUBLIC_IP>:~/GNN-FraudNet/data/processed/
+\end{lstlisting}
+
+The trained model and graph were then checked using SHA-256 hashes. The final hashes matched between local and EC2 copies:
+\begin{lstlisting}
+fc84d65da12a9428518e3be2722cc2e1ef14649a4f26b33d7fe3d259e0fdafce  results/best_graphsage.pt
+e05d1ca6a69e324f7ce5ebace75041df7746fa6b8115e5719fcf0a8411dbcdd3  data/processed/elliptic_graph.pt
+\end{lstlisting}
+
+This verified that production used the intended model and graph data.
+
+\section{Problem 3: Wrong PyTorch CPU Architecture}
+\subsection{Observed Problem}
+The Docker wheel cache initially contained an ARM64 PyTorch wheel, while EC2 was x86\_64.
+
+\subsection{Solution}
+The incorrect wheel was replaced by an x86\_64 CPU-only PyTorch 2.4.0 wheel:
+\begin{lstlisting}
+docker run --rm \
+  -v "$PWD/docker_wheels:/wheels" \
+  python:3.11-slim \
+  pip download torch==2.4.0 \
+  --index-url https://download.pytorch.org/whl/cpu \
+  --python-version 311 \
+  --platform linux_x86_64 \
+  --only-binary=:all: \
+  --no-deps \
+  -d /wheels
+\end{lstlisting}
+
+The CPU wheel was approximately 187 MB.
+
+\section{Problem 4: CUDA Dependency Failure}
+The first x86\_64 wheel was CUDA-enabled. Because the Docker build intentionally installed from a local wheel directory using \texttt{--no-index}, CUDA dependencies could not be resolved.
+
+The solution was to use the CPU-only PyTorch wheel. Since EC2 was performing inference rather than GPU training, CUDA was unnecessary.
+
+This simplified the runtime dependency graph:
+\[
+\text{PyTorch CPU} \quad \text{instead of} \quad
+\text{PyTorch + CUDA runtime stack}.
+\]
+
+\section{Problem 5: MarkupSafe Build Failure}
+During dependency installation, the Docker build encountered a failure involving \texttt{MarkupSafe>=2.0}. A compatible MarkupSafe wheel was added to the local Docker wheel cache so installation could occur without an unwanted source build.
+
+After this adjustment, the Docker image built successfully.
+
+\section{Problem 6: Transformers / PyTorch Compatibility}
+\subsection{Observed Problem}
+After the first successful image build, startup logs reported:
+\begin{lstlisting}
+[transformers] Disabling PyTorch because PyTorch >= 2.5
+is required but found 2.4.0+cpu
+NameError: name 'nn' is not defined
+\end{lstlisting}
+
+The issue was a compatibility mismatch between the pinned PyTorch 2.4.0 environment and newer installed versions of Transformers/Sentence Transformers.
+
+\subsection{Solution}
+The Docker requirements were pinned:
+\begin{lstlisting}
+sentence-transformers==3.3.1
+transformers==4.46.3
+\end{lstlisting}
+
+After a no-cache rebuild, the health endpoint reported:
+\begin{lstlisting}
+{
+  "status": "ok",
+  "model": "GraphSAGE",
+  "rag_available": true,
+  "llm_available": true,
+  "investigation_available": true
+}
+\end{lstlisting}
+
+This confirmed that model inference, RAG, LLM integration, and the investigation agent were all available.
+
+\section{Problem 7: Gemini Quota Exhaustion}
+\subsection{Observed Problem}
+The original LLM provider was Google Gemini. The application successfully reached Gemini, but the free-tier request quota was eventually exhausted.
+
+The logs showed:
+\begin{lstlisting}
+HTTP ... 429 Too Many Requests
+RESOURCE_EXHAUSTED
+Quota exceeded metric ... generate_content_free_tier_requests
+\end{lstlisting}
+
+The existing retry logic waited:
+\[
+1\,s,\quad 2\,s,\quad 4\,s
+\]
+between attempts. Consequently, quota failures added roughly seven seconds of delay.
+
+\subsection{Root Cause}
+The GNN, RAG, Docker, and FastAPI pipeline was not the source of the failure. The external LLM provider had exhausted its quota.
+
+\subsection{Solution}
+Instead of removing Gemini, the application was changed to support selectable LLM providers:
+\begin{lstlisting}
+GEMINI_API_KEY
+GROQ_API_KEY
+LLM_PROVIDER
+LLM_MODEL
+\end{lstlisting}
+
+The active deployment uses:
+\begin{lstlisting}
+LLM_PROVIDER=groq
+LLM_MODEL=openai/gpt-oss-120b
+\end{lstlisting}
+
+Gemini remains available as an alternative provider.
+
+\section{Problem 8: Groq Integration}
+The report generator was modified so client initialization depends on the selected provider:
+\begin{lstlisting}
+if LLM_PROVIDER == "groq":
+    client = Groq(api_key=GROQ_API_KEY)
+else:
+    client = Gemini(api_key=GEMINI_API_KEY)
+\end{lstlisting}
+
+The Groq request uses the OpenAI-compatible interface:
+\begin{lstlisting}
+response = client.chat.completions.create(
+    model=self.model,
+    messages=[{"role": "user", "content": prompt}],
+    temperature=LLM_TEMPERATURE,
+    max_tokens=LLM_MAX_TOKENS,
+)
+\end{lstlisting}
+
+The Groq dependency was added:
+\begin{lstlisting}
+groq>=0.30.0
+\end{lstlisting}
+
+API keys were stored only in \texttt{.env}. The repository already ignored \texttt{.env}, and it was also added to \texttt{.dockerignore}. Docker Compose passes the environment into the running container without copying the secret into the image.
+
+\section{Problem 9: Verifying Groq in Production}
+The rebuilt container was recreated:
+\begin{lstlisting}
+docker compose build
+docker compose up -d --force-recreate
+docker compose ps
+\end{lstlisting}
+
+The service became healthy.
+
+A full investigation was then executed:
+\begin{lstlisting}
+time curl -s -X POST \
+http://<PUBLIC_IP>/investigate/78642 > groq.json
+\end{lstlisting}
+
+Measured time:
+\[
+\boxed{3.739\text{ seconds}}
+\]
+
+The application logs explicitly confirmed:
+\begin{lstlisting}
+HTTP Request:
+POST https://api.groq.com/openai/v1/chat/completions
+HTTP/1.1 200 OK
+\end{lstlisting}
+
+followed by:
+\begin{lstlisting}
+Step 5/5 [LLM]: Report generated (3061 chars)
+Investigation complete for node 78642 in 3.73s
+\end{lstlisting}
+
+Thus Groq was verified as an actual production dependency, not merely a configuration value.
+
+\section{Problem 10: Public Exposure and Nginx}
+FastAPI/Uvicorn listens internally on port 8000. Instead of exposing this port publicly, Nginx was installed as a reverse proxy.
+
+The effective configuration was:
+\begin{lstlisting}
+server {
+    listen 80;
+    server_name <PUBLIC_IP>;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+\end{lstlisting}
+
+The configuration was validated using:
+\begin{lstlisting}
+sudo nginx -t
+\end{lstlisting}
+
+The default site was disabled and Nginx reloaded.
+
+The final request path is:
+\begin{verbatim}
+Browser -> AWS Security Group -> Nginx :80
+       -> 127.0.0.1:8000 -> Docker -> FastAPI
+\end{verbatim}
+
+\section{Problem 11: Security-Group and Port Design}
+The final Docker binding is:
+\begin{lstlisting}
+127.0.0.1:8000:8000
+\end{lstlisting}
+
+Therefore, port 8000 is not directly reachable from the Internet.
+
+The security group was configured conceptually as:
+\begin{itemize}
+\item SSH 22: restricted to the current client IP;
+\item HTTP 80: public;
+\item HTTPS 443: available;
+\item direct public port 8000: removed.
+\end{itemize}
+
+This produces a cleaner separation between the public web layer and the application process.
+
+\section{Runtime Verification}
+At startup, the container logs showed:
+\begin{lstlisting}
+Loaded graph: 203769 nodes, 234355 edges
+Loaded existing knowledge base: 43 chunks
+RAG knowledge base initialized
+LLM report generator initialized
+Investigation agent initialized
+Application startup complete
+\end{lstlisting}
+
+The health endpoint reported all major components available:
+\begin{lstlisting}
+{
+  "status": "ok",
+  "model": "GraphSAGE",
+  "rag_available": true,
+  "llm_available": true,
+  "investigation_available": true
+}
+\end{lstlisting}
+
+\section{Representative End-to-End Investigation}
+Node 78642 was used as a deployment verification case.
+
+The final prediction was:
+\begin{itemize}
+\item fraud probability: $0.1628465$;
+\item licit probability: $0.8371535$;
+\item label: \texttt{licit};
+\item confidence: \texttt{high}.
+\end{itemize}
+
+Graph analysis reported:
+\begin{itemize}
+\item in-degree: 1;
+\item out-degree: 1;
+\item total degree: 2;
+\item one-hop illicit neighbors: 0;
+\item two-hop illicit neighbors: 0;
+\item structural flag: \texttt{mostly\_unknown\_neighbors}.
+\end{itemize}
+
+GNNExplainer produced ten important features. The highest-ranked were:
+\begin{longtable}{ccc}
+\toprule
+Rank & Feature & Importance\\
+\midrule
+1 & feature\_149 & 0.8735\\
+2 & feature\_161 & 0.8727\\
+3 & feature\_7 & 0.8507\\
+4 & feature\_5 & 0.8410\\
+5 & feature\_64 & 0.8193\\
+6 & feature\_116 & 0.7794\\
+7 & feature\_158 & 0.6820\\
+8 & feature\_22 & 0.6509\\
+9 & feature\_148 & 0.6390\\
+10 & feature\_54 & 0.6360\\
+\bottomrule
+\end{longtable}
+
+The RAG system retrieved four relevant knowledge chunks, and the Groq LLM converted the structured evidence into a natural-language investigation report.
+
+\section{Performance Analysis}
+The deployment exposed the difference between local computation and external inference.
+
+The GNN prediction, explanation, graph analysis, and RAG retrieval were all sub-second operations. The external LLM request dominated the successful end-to-end latency.
+
+The final Groq-backed investigation completed in:
+\[
+\boxed{3.73\text{ s}}
+\]
+
+The earlier Gemini quota-failure path took approximately 8.5 seconds because the application retried three times after receiving HTTP 429 responses.
+
+Therefore, the major performance bottleneck is the external LLM call, not the GNN or RAG pipeline.
+
+\section{Lessons Learned}
+\subsection{Deployment Is an Integration Problem}
+The deployment required compatibility across:
+\[
+\text{PyTorch}+\text{PyG}+\text{Transformers}+\text{Sentence Transformers}
++\text{ChromaDB}+\text{LangGraph}+\text{FastAPI}+\text{Docker}
++\text{AWS}+\text{LLM API}.
+\]
+A failure in one layer can prevent the entire service from starting.
+
+\subsection{Pin Critical Dependencies}
+The Transformers/Sentence Transformers problem demonstrated why production environments should pin critical package versions rather than relying on arbitrary latest versions.
+
+\subsection{Separate Failure Layers}
+Failures occurred at several independent layers:
+\begin{enumerate}
+\item client network/SSH;
+\item AWS configuration;
+\item Docker build;
+\item Python dependencies;
+\item application initialization;
+\item external API quota;
+\item reverse proxy/public networking.
+\end{enumerate}
+Classifying failures by layer made diagnosis much faster.
+
+\subsection{Verify Artifacts}
+SHA-256 checksums provided strong evidence that the production server was using exactly the intended model and graph artifacts.
+
+\subsection{External API Abstraction}
+The provider switch demonstrated the value of an LLM abstraction:
+\[
+\text{Application}\rightarrow\text{LLM Interface}
+\rightarrow\{\text{Gemini},\text{Groq},\ldots\}.
+\]
+This is more resilient than hard-coding a single provider.
+
+\section{Known Limitations and Future Improvements}
+\subsection{Smarter Retry Logic}
+The application should distinguish transient rate limits from daily quota exhaustion. A permanent quota error should not trigger several immediate retries.
+
+\subsection{Streaming Provider Support}
+The main non-streaming investigation path was migrated to Groq. The separate streaming report path was originally Gemini-specific and should be updated if streaming is required.
+
+\subsection{HTTPS and Domain}
+A proper domain plus TLS certificate would make the public deployment more polished:
+\[
+\text{Domain}\rightarrow\text{Nginx}\rightarrow\text{TLS}\rightarrow\text{FastAPI}.
+\]
+
+\subsection{Authentication and Rate Limiting}
+A production financial application should add authentication, rate limiting, abuse protection, secret rotation, and appropriate CORS restrictions.
+
+\subsection{Monitoring}
+Useful production metrics include request latency, model inference latency, explanation latency, RAG latency, LLM latency, error rates, CPU/memory utilization, and container health.
+
+\section{Final Architecture}
+\begin{lstlisting}
+                         PUBLIC USER
+                              |
+                              v
+                    +-------------------+
+                    | AWS EC2           |
+                    | Ubuntu 24.04      |
+                    +---------+---------+
+                              |
+                       Security Group
+                              |
+                           HTTP/HTTPS
+                              |
+                              v
+                    +-------------------+
+                    | Nginx             |
+                    | Reverse Proxy     |
+                    +---------+---------+
+                              |
+                       127.0.0.1:8000
+                              |
+                              v
+              +-------------------------------+
+              | Docker Container              |
+              |                               |
+              | FastAPI / Uvicorn             |
+              |       |                       |
+              |       v                       |
+              | LangGraph Investigation Agent |
+              |       |                       |
+              |  +----+----+--------+------+  |
+              |  |         |        |      |  |
+              |  v         v        v      v  |
+              | GraphSAGE GNNExp  Graph   RAG |
+              |                     Analysis   |
+              |                              |
+              |             +----------------+
+              |             |
+              |             v
+              |        Groq LLM API
+              |             |
+              |             v
+              |    Investigation Report
+              +-------------------------------+
+\end{lstlisting}
+
+\section{Final Outcome}
+The final production path was verified as:
+\[
+\boxed{
+\text{Browser}
+\rightarrow
+\text{Nginx}
+\rightarrow
+\text{FastAPI}
+\rightarrow
+\text{LangGraph}
+\rightarrow
+\text{GraphSAGE}
+\rightarrow
+\text{GNNExplainer}
+\rightarrow
+\text{Graph Analysis}
+\rightarrow
+\text{ChromaDB RAG}
+\rightarrow
+\text{Groq LLM}
+\rightarrow
+\text{Investigation Report}
+}
+\]
+
+The public dashboard was subsequently tested through the browser and confirmed to work.
+
+The key engineering result is that the complete AI investigation system was made containerized, publicly accessible, operational, and resilient to a change in LLM provider while keeping the trained model and graph artifacts intact.
+
+\section*{Deployment Checklist}
+\begin{longtable}{p{0.72\textwidth}c}
+\toprule
+Item & Status\\
+\midrule
+AWS EC2 provisioned & \checkmark\\
+SSH access established & \checkmark\\
+Docker installed & \checkmark\\
+Docker Compose installed & \checkmark\\
+Model transferred and checksum verified & \checkmark\\
+Processed graph transferred and checksum verified & \checkmark\\
+CPU-compatible PyTorch installed & \checkmark\\
+Dependency compatibility fixed & \checkmark\\
+RAG knowledge base initialized & \checkmark\\
+FastAPI application healthy & \checkmark\\
+Nginx reverse proxy configured & \checkmark\\
+Direct public port 8000 removed & \checkmark\\
+Gemini provider retained as option & \checkmark\\
+Groq provider integrated & \checkmark\\
+Groq API request verified with HTTP 200 & \checkmark\\
+End-to-end investigation verified & \checkmark\\
+Public dashboard verified & \checkmark\\
+\bottomrule
+\end{longtable}
+
+\end{document}
