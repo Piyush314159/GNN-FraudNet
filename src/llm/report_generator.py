@@ -280,7 +280,7 @@ class ReportGenerator:
             
         if context.graph_analysis:
             g = context.graph_analysis
-            lines.append(f"- **Neighborhood Data Void:** There are {g.neighbors_1hop.total} total 1-hop and {g.neighbors_2hop.total} total 2-hop neighbors recorded in the subgraph ({g.neighbors_1hop.licit + g.neighbors_2hop.licit} licit, {g.neighbors_1hop.illicit + g.neighbors_2hop.illicit} illicit, {g.neighbors_1hop.unknown + g.neighbors_2hop.unknown} unknown labeled neighbors). Ground truth for Node {context.node_id} itself is {g.ground_truth_label}.")
+            lines.append(f"- **Neighborhood Data Void:** There are {g.neighbors_1hop.total} total 1-hop and {g.neighbors_2hop.total} total 2-hop neighbors recorded in the subgraph ({g.neighbors_1hop.licit + g.neighbors_2hop.licit} licit, {g.neighbors_1hop.illicit + g.neighbors_2hop.illicit} illicit, {g.neighbors_1hop.unknown + g.neighbors_2hop.unknown} unknown labeled neighbors). Target dataset answers are excluded from operational reports.")
             
         lines.append("- **Anonymization & Scope:** All 166 features are anonymized, preventing direct verification of actual values (e.g., fee rates, exact BTC volumes). Additionally, the model is limited to a static 2-hop receptive field without temporal sequence tracking.")
         

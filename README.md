@@ -128,6 +128,14 @@ The system employs a sophisticated pipeline orchestrated by LangGraph. Each step
 
 ---
 
+## Evaluation status and investigation integrity
+
+The saved classifier scores use the existing random 70/15/15 labelled-node split. XGBoost achieved F1 0.954 and PR-AUC 0.987; GraphSAGE achieved F1 0.739 and PR-AUC 0.917. These are distinct models. Chronological generalization, calibration, and generated-report accuracy have not been established by those scores.
+
+Operational graph analysis hides the target's dataset answer and treats every neighbour label as unknown by default. A caller may explicitly pass a `known_label_mask` containing only labels available at investigation time. Training, validation, and test membership alone does not establish that a label was historically available. The compatibility `ground_truth_label` response field always returns `unknown`; offline scoring can read labels separately.
+
+The RAG tests check software behavior, not report faithfulness or retrieval quality. A held-out investigation benchmark is still required. Existing PDF/TeX reports and sample JSON responses are historical exports and may describe the earlier implementation; this README and current code define current behavior.
+
 ## 📈 Results & Performance
 
 Test-set metrics from a 70/15/15 split of the labeled nodes:
@@ -140,7 +148,7 @@ Test-set metrics from a 70/15/15 split of the labeled nodes:
 | **GraphSAGE** | **0.739** | **0.917** | **0.936** | **✓** |
 | GAT | 0.449 | 0.615 | 0.779 | ✓ |
 
-> **Honest takeaway:** Tree-based baselines (XGBoost, RF) beat GNNs on this specific dataset because the 166 engineered features already encode rich neighborhood information. However, GraphSAGE demonstrates strong graph-aware learning, clearly beating linear models, and excels at leveraging structural context dynamically.
+> **Honest takeaway:** Tree-based baselines (XGBoost, RF) beat GNNs on this specific dataset because the 166 engineered features already encode rich neighborhood information. However, GraphSAGE demonstrates strong graph-aware learning, clearly beating linear models, while practical advantages over the tree baselines remain unproven.
 
 ---
 

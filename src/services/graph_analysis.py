@@ -45,8 +45,17 @@ class GraphAnalysisResult:
 class GraphAnalysisService:
     """Analyzes the graph structure around a given node."""
 
-    def __init__(self, data):
+    def __init__(self, data, known_label_mask=None):
         self.data = data
+        # Dataset labels are evaluation answers, not operational intelligence.
+        # Callers must explicitly identify labels known at investigation time.
+        self.known_label_mask = (
+            torch.zeros(data.num_nodes, dtype=torch.bool, device=data.y.device)
+            if known_label_mask is None
+            else torch.as_tensor(known_label_mask, dtype=torch.bool, device=data.y.device).clone()
+        )
+        if self.known_label_mask.shape != data.y.shape:
+            raise ValueError("known_label_mask must have one entry per node")
         self._precompute_degrees()
 
     def _precompute_degrees(self) -> None:
@@ -64,10 +73,6 @@ class GraphAnalysisService:
         """Perform full structural analysis of a node's neighborhood."""
         if node_id < 0 or node_id >= self.data.num_nodes:
             raise ValueError(f"Node {node_id} not in graph")
-
-        # Ground truth
-        label_val = self.data.y[node_id].item()
-        gt_label = {0: "licit", 1: "illicit"}.get(label_val, "unknown")
 
         # Degree
         in_deg = self._in_degree[node_id].item()
@@ -94,7 +99,6 @@ class GraphAnalysisService:
             in_degree=in_deg,
             out_degree=out_deg,
             total_degree=in_deg + out_deg,
-            ground_truth_label=gt_label,
             neighbors_1hop=neighbors_1,
             neighbors_2hop=neighbors_2,
             structural_flags=flags,
@@ -114,7 +118,8 @@ class GraphAnalysisService:
         if len(neighbor_indices) == 0:
             return NeighborSummary()
 
-        labels = self.data.y[neighbor_indices]
+        labels = self.data.y[neighbor_indices].clone()
+        labels[~self.known_label_mask[neighbor_indices]] = -1
         n_illicit = (labels == 1).sum().item()
         n_licit = (labels == 0).sum().item()
         n_unknown = (labels == -1).sum().item()

@@ -165,7 +165,6 @@ class InvestigationService:
             g = context.graph_analysis
             n1 = g.neighbors_1hop
             lines = [
-                f"- Ground truth label in dataset: {g.ground_truth_label}",
                 f"- In-degree: {g.in_degree}, Out-degree: {g.out_degree}, Total degree: {g.total_degree}",
                 "",
                 "1-hop Neighbors:",

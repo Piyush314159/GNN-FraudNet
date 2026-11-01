@@ -27,18 +27,25 @@ class TestGraphAnalysis:
         n = result.neighbors_1hop
         assert n.total == n.illicit + n.licit + n.unknown
 
-    def test_ground_truth_label(self, graph_analysis_service):
-        # Node 0 is licit in mock data
-        result = graph_analysis_service.analyze_node(0)
-        assert result.ground_truth_label == "licit"
+    def test_dataset_answers_hidden_by_default(self, graph_analysis_service):
+        for node_id in (0, 10, 20):
+            result = graph_analysis_service.analyze_node(node_id)
+            assert result.ground_truth_label == "unknown"
+            assert result.neighbors_1hop.illicit == 0
+            assert result.neighbors_1hop.licit == 0
 
-        # Node 10 is illicit in mock data
-        result = graph_analysis_service.analyze_node(10)
-        assert result.ground_truth_label == "illicit"
+    def test_only_explicitly_known_neighbor_labels_are_used(self):
+        import torch
+        from torch_geometric.data import Data
 
-        # Node 20 is unknown in mock data
-        result = graph_analysis_service.analyze_node(20)
-        assert result.ground_truth_label == "unknown"
+        data = Data(x=torch.zeros(3, 1), y=torch.tensor([-1, 1, 0]),
+                    edge_index=torch.tensor([[1, 2], [0, 0]]))
+        service = GraphAnalysisService(data, known_label_mask=[False, True, False])
+        summary = service.analyze_node(0).neighbors_1hop
+        assert (summary.total, summary.illicit, summary.licit, summary.unknown) == (2, 1, 0, 1)
+        # Changing held-out answers cannot change operational analysis.
+        data.y[2] = 1
+        assert service.analyze_node(0).neighbors_1hop == summary
 
 
 class TestInvestigationService:
@@ -68,6 +75,9 @@ class TestInvestigationService:
         for key, value in sections.items():
             assert isinstance(value, str)
             assert len(value) > 0
+        assert "ground truth" not in sections["graph_section"].lower()
+        context.graph_analysis.ground_truth_label = "LEAK_SENTINEL"
+        assert "LEAK_SENTINEL" not in str(investigation_service.format_context_for_llm(context))
 
     def test_context_captures_errors_gracefully(self, investigation_service):
         """Build context for a valid node should have no errors."""
