@@ -1,0 +1,18 @@
+{
+  "python": "3.11.17",
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "packages": {
+    "torch": "2.4.0",
+    "torch-geometric": "2.8.0.post1",
+    "numpy": "2.4.6",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.0",
+    "xgboost": "3.2.0",
+    "joblib": "1.5.3"
+  },
+  "source_sha256": {
+    "src/model_selection.py": "634ab6c8f35c7a26f2c067009f691994662d09cdec3b76de57a76b0b6c2e6788",
+    "src/models/tabular.py": "53f57f5e9742642af11f7dd71ea1b70756ae9e512b160317dea69fd7b518a5bd",
+    "src/models/graphsage.py": "4e724663416f429e08931a0b3bdf34dd4bb1bbbef4d84e3d52b9542a6852415e"
+  }
+}

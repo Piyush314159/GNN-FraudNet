@@ -1,4 +1,7 @@
 .venv
+source
+&amp;&amp;
+{data
 .git
 .idea
 __pycache__

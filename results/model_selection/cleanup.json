@@ -1,0 +1,199 @@
+{
+  "removed": [
+    {
+      "path": "source",
+      "files": 1680,
+      "bytes": 18867410
+    },
+    {
+      "path": "&amp;&amp;",
+      "files": 1680,
+      "bytes": 18870384
+    },
+    {
+      "path": "{data",
+      "files": 0,
+      "bytes": 0
+    },
+    {
+      "path": "test_predict.py",
+      "files": 1,
+      "bytes": 331
+    },
+    {
+      "path": "check_transaction.py",
+      "files": 1,
+      "bytes": 3954
+    },
+    {
+      "path": "src/models/gat.py",
+      "files": 1,
+      "bytes": 2726
+    },
+    {
+      "path": "src/models/baseline.py",
+      "files": 1,
+      "bytes": 2623
+    },
+    {
+      "path": "src/models/tabular.py",
+      "files": 1,
+      "bytes": 1392
+    },
+    {
+      "path": "src/models/tabular_research.py",
+      "files": 1,
+      "bytes": 1418
+    },
+    {
+      "path": "src/model_selection.py",
+      "files": 1,
+      "bytes": 14827
+    },
+    {
+      "path": "src/rolling_comparison.py",
+      "files": 1,
+      "bytes": 13502
+    },
+    {
+      "path": "src/trial_pruning.py",
+      "files": 1,
+      "bytes": 3193
+    },
+    {
+      "path": "tests/test_model_selection.py",
+      "files": 1,
+      "bytes": 1974
+    },
+    {
+      "path": "tests/test_rolling_comparison.py",
+      "files": 1,
+      "bytes": 2553
+    },
+    {
+      "path": "tests/test_trial_pruning.py",
+      "files": 1,
+      "bytes": 1198
+    },
+    {
+      "path": "requirements-experiments.txt",
+      "files": 1,
+      "bytes": 174
+    },
+    {
+      "path": "results/best_gat.pt",
+      "files": 1,
+      "bytes": 47052
+    },
+    {
+      "path": "results/plots/gnn/gat_eval.png",
+      "files": 1,
+      "bytes": 73761
+    },
+    {
+      "path": "results/plots/gnn/gat_curves.png",
+      "files": 1,
+      "bytes": 128845
+    },
+    {
+      "path": "results/model_selection/chronological_v1/selected_model",
+      "files": 3,
+      "bytes": 833224
+    },
+    {
+      "path": ".pytest_cache",
+      "files": 5,
+      "bytes": 11855
+    },
+    {
+      "path": ".DS_Store",
+      "files": 1,
+      "bytes": 12292
+    },
+    {
+      "path": "tests/__pycache__",
+      "files": 10,
+      "bytes": 151425
+    },
+    {
+      "path": "tests/.DS_Store",
+      "files": 1,
+      "bytes": 6148
+    },
+    {
+      "path": "results/.DS_Store",
+      "files": 1,
+      "bytes": 6148
+    },
+    {
+      "path": "api/__pycache__",
+      "files": 2,
+      "bytes": 24428
+    },
+    {
+      "path": "api/.DS_Store",
+      "files": 1,
+      "bytes": 6148
+    },
+    {
+      "path": "data/.DS_Store",
+      "files": 1,
+      "bytes": 6148
+    },
+    {
+      "path": "src/__pycache__",
+      "files": 11,
+      "bytes": 117275
+    },
+    {
+      "path": "src/.DS_Store",
+      "files": 1,
+      "bytes": 6148
+    },
+    {
+      "path": "src/llm/__pycache__",
+      "files": 3,
+      "bytes": 26336
+    },
+    {
+      "path": "src/agents/__pycache__",
+      "files": 2,
+      "bytes": 17052
+    },
+    {
+      "path": "src/models/__pycache__",
+      "files": 6,
+      "bytes": 18267
+    },
+    {
+      "path": "src/rag/__pycache__",
+      "files": 3,
+      "bytes": 14534
+    },
+    {
+      "path": "src/services/__pycache__",
+      "files": 5,
+      "bytes": 37317
+    }
+  ],
+  "removed_files": 3432,
+  "reclaimed_bytes": 39332062,
+  "retained": [
+    "results/model_selection/rolling_v2/selected_model",
+    "results/best_graphsage.pt",
+    "data",
+    ".venv",
+    "notebooks",
+    "reports and research documentation",
+    "comparison metrics and summaries"
+  ],
+  "replacement_trainer": "src/train_random_forest.py",
+  "note": "GraphSAGE remains required by the active API. Notebook implementations and historical reports are retained as research records. Experiment runners and unused standalone model implementations were removed.",
+  "verification": {
+    "tests_passed": 42,
+    "selected_artifact_unchanged": true,
+    "active_graphsage_load_and_prediction": "passed",
+    "retained_recipe_real_data_reproduction": "passed",
+    "optional_research_package_uninstalled": "rtdl-revisiting-models"
+  }
+}

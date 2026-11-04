@@ -1,0 +1,13 @@
+{
+  "model": "random_forest",
+  "maximum_probability_difference": 1.1102230246251565e-16,
+  "classification_changes": 0,
+  "metrics_match_within": 1e-08,
+  "note": "Parallel forest reductions can differ at floating-point rounding precision",
+  "artifact_sha256": {
+    "evaluation_probabilities.npy": "b5904529eb76a298fc859c25a97cacbf8129ca61a5731e072290d7cab0c8ea8c",
+    "metadata.json": "186561e12615a1710ac7dec291a91df27bce32fe1a1a7d18468247cfa1eac796",
+    "scaler.joblib": "555081a951cdff171bcde601b449d6c797672c4b0ad18216fe4433fa7b9e66d8",
+    "model.joblib": "4b20468c50a2609e771afc46445780cbc21b2eb5a7004bed6bdf416e89bb0437"
+  }
+}

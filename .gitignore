@@ -3,6 +3,9 @@ data/processed/*.pt
 
 # Virtual environment
 .venv/
+/source/
+/&amp;&amp;/
+/{data/
 
 # IDE
 .idea/

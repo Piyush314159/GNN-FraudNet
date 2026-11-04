@@ -1,0 +1,258 @@
+{
+  "protocol": "chronological_v1",
+  "seed": 42,
+  "max_epochs": 40,
+  "features": "93 local attributes; excludes timestep and 72 supplied aggregate attributes",
+  "split": {
+    "train": {
+      "nodes": 29894,
+      "illicit": 3462,
+      "time_min": 1,
+      "time_max": 34
+    },
+    "validation": {
+      "nodes": 7829,
+      "illicit": 675,
+      "time_min": 35,
+      "time_max": 41
+    },
+    "test": {
+      "nodes": 8841,
+      "illicit": 408,
+      "time_min": 42,
+      "time_max": 49
+    }
+  },
+  "selection_rule": "Validation AP gain >= 0.002 AND no validation F1 regression; thresholds chosen on validation only",
+  "limitations": [
+    "Single seed and bounded tuning budget; exploratory comparison",
+    "Within-period graph ordering and raw local-feature publication times are unavailable",
+    "Validation reused for early stopping, threshold choice, and model selection"
+  ],
+  "experiments": [
+    {
+      "model": "graphsage",
+      "validation": {
+        "pr_auc": 0.37540818339107557,
+        "f1": 0.40927258193445243,
+        "precision": 0.4444444444444444,
+        "recall": 0.37925925925925924,
+        "brier": 0.2087792456150055,
+        "confusion_matrix": [
+          [
+            6834,
+            320
+          ],
+          [
+            419,
+            256
+          ]
+        ],
+        "threshold": 0.5261906385421753
+      },
+      "epochs": 21,
+      "seconds": 19.87,
+      "decision": "reference"
+    },
+    {
+      "model": "xgboost",
+      "validation": {
+        "pr_auc": 0.9251648809195194,
+        "f1": 0.8925750394944708,
+        "precision": 0.9560067681895094,
+        "recall": 0.837037037037037,
+        "brier": 0.02501234970986843,
+        "confusion_matrix": [
+          [
+            7128,
+            26
+          ],
+          [
+            110,
+            565
+          ]
+        ],
+        "threshold": 0.8587068915367126
+      },
+      "epochs": null,
+      "seconds": 1.04,
+      "compared_with": "graphsage",
+      "decision": "keep"
+    },
+    {
+      "model": "random_forest",
+      "validation": {
+        "pr_auc": 0.9263799168814068,
+        "f1": 0.9052132701421801,
+        "precision": 0.9695431472081218,
+        "recall": 0.8488888888888889,
+        "brier": 0.025482407212111924,
+        "confusion_matrix": [
+          [
+            7136,
+            18
+          ],
+          [
+            102,
+            573
+          ]
+        ],
+        "threshold": 0.756566341066341
+      },
+      "epochs": null,
+      "seconds": 3.22,
+      "compared_with": "xgboost",
+      "decision": "reject"
+    },
+    {
+      "model": "mlp",
+      "validation": {
+        "pr_auc": 0.8817837186118642,
+        "f1": 0.8621513944223107,
+        "precision": 0.9327586206896552,
+        "recall": 0.8014814814814815,
+        "brier": 0.12486089766025543,
+        "confusion_matrix": [
+          [
+            7115,
+            39
+          ],
+          [
+            134,
+            541
+          ]
+        ],
+        "threshold": 0.9361482262611389
+      },
+      "epochs": 7,
+      "seconds": 0.71,
+      "compared_with": "xgboost",
+      "decision": "reject"
+    },
+    {
+      "model": "resnet",
+      "validation": {
+        "pr_auc": 0.8760999703461092,
+        "f1": 0.8597560975609756,
+        "precision": 0.8854003139717426,
+        "recall": 0.8355555555555556,
+        "brier": 0.12130454182624817,
+        "confusion_matrix": [
+          [
+            7081,
+            73
+          ],
+          [
+            111,
+            564
+          ]
+        ],
+        "threshold": 0.913600742816925
+      },
+      "epochs": 7,
+      "seconds": 0.7,
+      "compared_with": "xgboost",
+      "decision": "reject"
+    },
+    {
+      "model": "transformer",
+      "validation": {
+        "pr_auc": 0.8803463322587091,
+        "f1": 0.859721082854799,
+        "precision": 0.9632352941176471,
+        "recall": 0.7762962962962963,
+        "brier": 0.06693125516176224,
+        "confusion_matrix": [
+          [
+            7134,
+            20
+          ],
+          [
+            151,
+            524
+          ]
+        ],
+        "threshold": 0.850641131401062
+      },
+      "epochs": 8,
+      "seconds": 86.81,
+      "compared_with": "xgboost",
+      "decision": "reject"
+    },
+    {
+      "model": "graphsage_xgboost",
+      "validation": {
+        "pr_auc": 0.923366969904881,
+        "f1": 0.89344909234412,
+        "precision": 0.956081081081081,
+        "recall": 0.8385185185185186,
+        "brier": 0.0232592411339283,
+        "confusion_matrix": [
+          [
+            7128,
+            26
+          ],
+          [
+            109,
+            566
+          ]
+        ],
+        "threshold": 0.8114890456199646
+      },
+      "epochs": null,
+      "seconds": 3.52,
+      "compared_with": "xgboost",
+      "decision": "reject"
+    }
+  ],
+  "data_sha256": {
+    "elliptic_txs_classes.csv": "93e2e7b2405c735ba752bf6ba06b947561deddd1f5a8fc91e46f6a4c0e439493",
+    "elliptic_txs_edgelist.csv": "a35053ba68a98e4382cae2ba65b9d9e36b23b6439e02dff084971b1b72a5156e",
+    "elliptic_txs_features.csv": "fd7f83573443c9e302e371d3f110e3b6224160f5d1ed8a287757936127800ff0"
+  },
+  "selected_model": "xgboost",
+  "final_test": {
+    "graphsage": {
+      "pr_auc": 0.1853353206052951,
+      "f1": 0.24830261881668284,
+      "precision": 0.20545746388443017,
+      "recall": 0.3137254901960784,
+      "brier": 0.22937095165252686,
+      "confusion_matrix": [
+        [
+          7938,
+          495
+        ],
+        [
+          280,
+          128
+        ]
+      ],
+      "threshold": 0.5261906385421753
+    },
+    "selected": {
+      "pr_auc": 0.5307275863511113,
+      "f1": 0.567398119122257,
+      "precision": 0.7869565217391304,
+      "recall": 0.44362745098039214,
+      "brier": 0.04356510937213898,
+      "confusion_matrix": [
+        [
+          8384,
+          49
+        ],
+        [
+          227,
+          181
+        ]
+      ],
+      "threshold": 0.8587068915367126
+    }
+  },
+  "promotion_passed": true,
+  "production_changed": false,
+  "retained_artifact": null,
+  "original_retained_artifact": "results/model_selection/chronological_v1/selected_model",
+  "artifact_status": "Superseded XGBoost files removed during user-requested cleanup; metrics preserved",
+  "source_status": "Historical experiment source fingerprints; retired comparison scripts and rejected standalone models removed during cleanup. Current retained-model trainer: src/train_random_forest.py."
+}
