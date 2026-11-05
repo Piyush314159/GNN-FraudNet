@@ -5,7 +5,7 @@ data/processed/*.pt
 .venv/
 /source/
 /&amp;&amp;/
-/{data/
+/[{]data/
 
 # IDE
 .idea/

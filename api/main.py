@@ -174,12 +174,18 @@ def dashboard():
 
 @app.get("/health")
 def health():
+    data = app.state.data
     return {
         "status": "ok",
         "model": "GraphSAGE",
         "rag_available": app.state.retriever is not None,
         "llm_available": app.state.report_generator is not None,
         "investigation_available": app.state.investigation_agent is not None,
+        "dataset": {
+            "nodes": data.num_nodes,
+            "edges": data.edge_index.size(1),
+            "features": data.x.size(1),
+        },
     }
 
 

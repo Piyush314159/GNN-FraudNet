@@ -55,6 +55,7 @@ class TestHealthEndpoint:
         data = response.json()
         assert data["status"] == "ok"
         assert data["model"] == "GraphSAGE"
+        assert data["dataset"] == {"nodes": 50, "edges": 100, "features": 166}
 
 
 class TestPredictEndpoint:

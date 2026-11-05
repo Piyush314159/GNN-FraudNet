@@ -59,7 +59,7 @@ A FastAPI server that turns the trained PyTorch model into a usable service. Ins
 Bundles Python 3.11, PyTorch, PyG, FastAPI, the trained model, and the graph data into a single `gnn-fraudnet` image. This eliminates "works on my machine" issues and ensures that the API runs consistently on any OS without complicated setup.
 
 ### 4️⃣ AWS Deployment & Public Website
-The Docker container is deployed on an AWS EC2 instance. We use Nginx as a reverse proxy to route public HTTP traffic (port 80) securely to the internal Docker container (port 8000), making the interactive cyberpunk dashboard and API endpoints accessible to the world.
+The Docker container is deployed on an AWS EC2 instance. We use Nginx as a reverse proxy to route public HTTP traffic (port 80) securely to the internal Docker container (port 8000), making the investigation workspace and API endpoints accessible to the world.
 
 ---
 
@@ -202,7 +202,10 @@ cp .env.example .env
 ```bash
 uvicorn api.main:app --reload --port 8000
 ```
-Open **http://localhost:8000** in your browser to view the interactive dashboard.
+Open **http://localhost:8000** in your browser to view the investigation workspace.
+It includes graph-node analysis, feature-vector input, CSV batch screening,
+on-demand reports, exports, and actual service availability. See the
+[dashboard guide](docs/dashboard.md) for the interface and frontend checks.
 
 ### 4. Test the Investigation Endpoint
 ```bash
@@ -372,7 +375,7 @@ GNN-FraudNet/
 ├── api/
 │   ├── main.py                      ← FastAPI app + all endpoints
 │   ├── schema.py                    ← Pydantic request/response models
-│   └── static/index.html            ← interactive dashboard UI
+│   └── static/                      ← dashboard HTML, CSS and JavaScript modules
 │
 ├── tests/                           ← pytest test suite
 ├── notebooks/                       ← research pipeline (4 notebooks)
@@ -417,7 +420,7 @@ Tests use synthetic 50-node graphs — no need for the real dataset to run unit 
 | LLM | Groq (openai/gpt-oss-120b) / Google Gemini |
 | Agentic Workflow | LangGraph |
 | API | FastAPI · Uvicorn |
-| Frontend | Vanilla HTML/CSS/JS (cyberpunk dashboard) |
+| Frontend | Vanilla HTML/CSS/JS (responsive analyst workspace; no build step) |
 | Cloud / Network | Nginx Reverse Proxy · AWS Security Groups |
 | Deployment | Docker · Docker Compose · AWS EC2 (Ubuntu 24.04) |
 | CI/CD | GitHub Actions |

@@ -65,3 +65,18 @@ and evaluation metrics. The active GraphSAGE model, its training utilities and
 the API's explanation dependencies remain until a complete serving migration.
 Historical notebook implementations and report listings are research records,
 not the current training interface. See the [cleanup manifest](../results/model_selection/cleanup.json).
+
+## Dashboard redesign completed
+
+The [dashboard](dashboard.md) now uses a responsive analyst workspace with
+graph-node/feature input, network evidence, on-demand reports, session history,
+validated CSV screening and exports, and actual dataset/service information.
+Remote fonts and runtime CDNs were removed. Report content and user-controlled
+labels are rendered as text, and streamed reports support cancellation/retry.
+Frontend classifications now follow the server's returned label.
+
+Local browser checks covered real predictions and local-summary reports, batch
+upload/export, validation, mobile layouts, cancellation and disconnection states.
+The serving model remains GraphSAGE. Unified backend classification thresholds,
+report/explainer correctness and migration to the retained Random Forest remain
+separate integration priorities. The local redesign does not redeploy AWS.
