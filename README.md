@@ -59,7 +59,7 @@ A FastAPI server that turns the trained PyTorch model into a usable service. Ins
 Bundles Python 3.11, PyTorch, PyG, FastAPI, the trained model, and the graph data into a single `gnn-fraudnet` image. This eliminates "works on my machine" issues and ensures that the API runs consistently on any OS without complicated setup.
 
 ### 4️⃣ AWS Deployment & Public Website
-The Docker container is deployed on an AWS EC2 instance. We use Nginx as a reverse proxy to route public HTTP traffic (port 80) securely to the internal Docker container (port 8000), making the interactive cyberpunk dashboard and API endpoints accessible to the world.
+The Docker container is deployed on an AWS EC2 instance. We use Nginx as a reverse proxy to route public HTTP traffic (port 80) securely to the internal Docker container (port 8000), making the investigation workspace and API endpoints accessible to the world.
 
 ---
 
@@ -130,6 +130,29 @@ The system employs a sophisticated pipeline orchestrated by LangGraph. Each step
 
 ## Evaluation status and investigation integrity
 
+The current research training entrypoint is `python -m src.train_random_forest --output results/random_forest_retrain`. See the
+[Random Forest workflow](docs/random-forest.md). Retired experiment runners,
+rejected standalone model code, duplicate environments and superseded weights
+have been removed; comparison records remain. GraphSAGE is retained because the
+active API and explanation pipeline still depend on it.
+
+The [second, rolling comparison](results/model_selection/rolling_v2/summary.md)
+retains Random Forest as the latest research candidate. Across three historical
+evaluation windows and two seeds, it averages AP 0.890 and fraud F1 0.862, compared
+with XGBoost's 0.886 and 0.847. The official MLP, ResNet, and graph hybrid did not
+pass the improvement rule; the official FT-Transformer was rejected early once
+even perfect remaining scores could not recover its required two-window
+consistency. These are development results, not a new independent final test.
+The observed periods 42–49 were excluded. See the [rolling protocol](docs/rolling-comparison.md).
+
+The first [chronological model comparison](results/model_selection/chronological_v1/summary.md)
+uses 93 local attributes and earlier-to-later time splits. XGBoost is the retained
+experimental candidate: held-out AP 0.531 and fraud F1 0.567, versus 0.185 and
+0.248 for the freshly trained GraphSAGE reference. These scores are not directly
+comparable with the historical random-split results below. The API still uses
+its existing GraphSAGE model. See the [experiment protocol](docs/model-selection.md)
+for the selection rule, reproducible command, and limitations.
+
 The saved classifier scores use the existing random 70/15/15 labelled-node split. XGBoost achieved F1 0.954 and PR-AUC 0.987; GraphSAGE achieved F1 0.739 and PR-AUC 0.917. These are distinct models. Chronological generalization, calibration, and generated-report accuracy have not been established by those scores.
 
 Operational graph analysis hides the target's dataset answer and treats every neighbour label as unknown by default. A caller may explicitly pass a `known_label_mask` containing only labels available at investigation time. Training, validation, and test membership alone does not establish that a label was historically available. The compatibility `ground_truth_label` response field always returns `unknown`; offline scoring can read labels separately.
@@ -179,7 +202,10 @@ cp .env.example .env
 ```bash
 uvicorn api.main:app --reload --port 8000
 ```
-Open **http://localhost:8000** in your browser to view the interactive dashboard.
+Open **http://localhost:8000** in your browser to view the investigation workspace.
+It includes graph-node analysis, feature-vector input, CSV batch screening,
+on-demand reports, exports, and actual service availability. See the
+[dashboard guide](docs/dashboard.md) for the interface and frontend checks.
 
 ### 4. Test the Investigation Endpoint
 ```bash
@@ -324,9 +350,8 @@ GNN-FraudNet/
 ├── src/
 │   ├── config.py                    ← centralized configuration
 │   ├── models/
-│   │   ├── graphsage.py             ← GraphSAGE model
-│   │   ├── gat.py                   ← GAT model
-│   │   └── baseline.py              ← LogReg / RF / XGBoost
+│   │   └── graphsage.py             ← active API model
+│   ├── train_random_forest.py       ← retained research training recipe
 │   ├── services/
 │   │   ├── prediction.py            ← model inference service
 │   │   ├── explainability.py        ← SHAP / GNNExplainer wrapper
@@ -350,7 +375,7 @@ GNN-FraudNet/
 ├── api/
 │   ├── main.py                      ← FastAPI app + all endpoints
 │   ├── schema.py                    ← Pydantic request/response models
-│   └── static/index.html            ← interactive dashboard UI
+│   └── static/                      ← dashboard HTML, CSS and JavaScript modules
 │
 ├── tests/                           ← pytest test suite
 ├── notebooks/                       ← research pipeline (4 notebooks)
@@ -395,7 +420,7 @@ Tests use synthetic 50-node graphs — no need for the real dataset to run unit 
 | LLM | Groq (openai/gpt-oss-120b) / Google Gemini |
 | Agentic Workflow | LangGraph |
 | API | FastAPI · Uvicorn |
-| Frontend | Vanilla HTML/CSS/JS (cyberpunk dashboard) |
+| Frontend | Vanilla HTML/CSS/JS (responsive analyst workspace; no build step) |
 | Cloud / Network | Nginx Reverse Proxy · AWS Security Groups |
 | Deployment | Docker · Docker Compose · AWS EC2 (Ubuntu 24.04) |
 | CI/CD | GitHub Actions |

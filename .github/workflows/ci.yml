@@ -52,8 +52,24 @@ jobs:
           python -c "from src.rag.knowledge_base import KnowledgeBase; print('RAG OK')"
           python -c "from src.agents.investigation_agent import InvestigationAgent; print('Agent OK')"
 
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check dashboard scripts and behavior
+        run: |
+          node --check api/static/dashboard.mjs
+          node --check api/static/dashboard-core.mjs
+          node --test tests/dashboard.test.mjs
+
   docker:
-    needs: test
+    needs: [test, frontend]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 

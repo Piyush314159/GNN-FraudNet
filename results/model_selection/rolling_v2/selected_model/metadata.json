@@ -1,0 +1,16 @@
+{
+  "model": "random_forest",
+  "threshold": 0.8017883116883117,
+  "seed": 42,
+  "raw_feature_slice": [
+    1,
+    94
+  ],
+  "n_features": 93,
+  "train_end": 34,
+  "tune_end": 37,
+  "evaluated_through": 41,
+  "network_config": null,
+  "production_ready": false,
+  "note": "Research checkpoint from last window, seed 42; evaluation labels are not training targets"
+}
